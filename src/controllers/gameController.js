@@ -97,9 +97,15 @@ const placeBet = async (req, res) => {
 };
 
 // @desc    Get user bet history
-// @route   GET /api/game/my-bets
+// @route   GET /api/game/my-bets?mobile=...
 // @access  Public / Private
 const getMyBets = async (req, res) => {
+  const userMobile = req.query.mobile || req.query.user;
+  if (userMobile && userMobile.trim().length >= 10) {
+    const cleanMobile = userMobile.replace(/[^0-9]/g, '').slice(-10);
+    const userBets = memoryBets.filter(b => b.user && b.user.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+    return res.json(userBets);
+  }
   res.json(memoryBets);
 };
 
