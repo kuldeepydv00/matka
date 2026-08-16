@@ -1,0 +1,308 @@
+{
+  "registeredUsers": [
+    {
+      "id": "usr_1786822120156",
+      "name": "1234567888",
+      "mobile": "1234567888",
+      "password": "123",
+      "balance": 3520,
+      "status": "Active",
+      "createdAt": "12:58 AM",
+      "createdDateKey": "2026-08-16"
+    },
+    {
+      "id": "usr_1786823754000",
+      "name": "yogibbk",
+      "mobile": "7027709695",
+      "password": "123",
+      "balance": 990,
+      "status": "Active",
+      "createdAt": "01:54 AM",
+      "createdDateKey": "2026-08-16"
+    },
+    {
+      "id": "usr_1786828469077",
+      "name": "yad",
+      "mobile": "1111111111",
+      "password": "1111",
+      "balance": 500600.6333,
+      "status": "Active",
+      "createdAt": "02:44 AM",
+      "createdDateKey": "2026-08-16"
+    }
+  ],
+  "userWalletStore": {
+    "balance": 0,
+    "name": "yad",
+    "mobile": "1111111111"
+  },
+  "memoryDeposits": [
+    {
+      "_id": "dep_1786826597735",
+      "user": "yogibbk (7027709695)",
+      "amount": 500,
+      "method": "UPI / PhonePe",
+      "utr": "UTR7027709695",
+      "status": "Approved",
+      "createdAt": "02:13 AM"
+    },
+    {
+      "_id": "dep_1786826173221",
+      "user": "1234567888 (1234567888)",
+      "amount": 500,
+      "method": "UPI / PhonePe",
+      "utr": "UTR1786826166027",
+      "status": "Rejected",
+      "createdAt": "02:06 AM"
+    },
+    {
+      "_id": "dep_1786823932106",
+      "user": "1234567888 (1234567888)",
+      "amount": 100,
+      "method": "UPI / PhonePe",
+      "utr": "UTR1786823924756",
+      "status": "Approved",
+      "createdAt": "01:28 AM"
+    },
+    {
+      "_id": "dep_1786823912526",
+      "user": "1234567888 (1234567888)",
+      "amount": 500,
+      "method": "UPI / PhonePe",
+      "utr": "UTR1786823905256",
+      "status": "Rejected",
+      "createdAt": "01:28 AM"
+    },
+    {
+      "_id": "dep_1786823464755",
+      "user": "1234567888 (1234567888)",
+      "amount": 500,
+      "method": "UPI / PhonePe",
+      "utr": "UTR1786823457228",
+      "status": "Approved",
+      "createdAt": "01:21 AM"
+    },
+    {
+      "_id": "dep_1786823430186",
+      "user": "1234567888 (1234567888)",
+      "amount": 500,
+      "method": "UPI / PhonePe",
+      "utr": "UTR1786823422537",
+      "status": "Approved",
+      "createdAt": "01:20 AM"
+    }
+  ],
+  "memoryWithdrawals": [
+    {
+      "_id": "wth_1786823961195",
+      "user": "1234567888 (1234567888)",
+      "amount": 1000,
+      "accountName": "kd",
+      "accountNumber": "2131jnjnjnj332kjkjj34",
+      "ifsc": "131233NJ43",
+      "status": "Rejected",
+      "createdAt": "01:29 AM"
+    }
+  ],
+  "memoryBets": [
+    {
+      "_id": "bet_1786826518620_77",
+      "game_name": "Gali",
+      "bet_type": "JODI",
+      "number": 12,
+      "bet_amount": 10,
+      "potential_payout": 950,
+      "win_amount": 0,
+      "status": "pending",
+      "user": "7027709695",
+      "created_at": "2026-08-15T20:41:58.620Z"
+    },
+    {
+      "_id": "bet_1786822833369_254",
+      "game_name": "Gali",
+      "bet_type": "JODI",
+      "number": 12,
+      "bet_amount": 10,
+      "potential_payout": 950,
+      "win_amount": 0,
+      "status": "pending",
+      "created_at": "2026-08-15T19:40:33.369Z"
+    },
+    {
+      "_id": "bet_1786822833368_698",
+      "game_name": "Gali",
+      "bet_type": "JODI",
+      "number": 21,
+      "bet_amount": 10,
+      "potential_payout": 950,
+      "win_amount": 0,
+      "status": "pending",
+      "created_at": "2026-08-15T19:40:33.368Z"
+    },
+    {
+      "_id": "bet_1786822833367_993",
+      "game_name": "Gali",
+      "bet_type": "JODI",
+      "number": 22,
+      "bet_amount": 10,
+      "potential_payout": 950,
+      "win_amount": 0,
+      "status": "pending",
+      "created_at": "2026-08-15T19:40:33.367Z"
+    },
+    {
+      "_id": "bet_1786822833366_433",
+      "game_name": "Gali",
+      "bet_type": "JODI",
+      "number": 11,
+      "bet_amount": 10,
+      "potential_payout": 950,
+      "win_amount": 0,
+      "status": "pending",
+      "created_at": "2026-08-15T19:40:33.366Z"
+    },
+    {
+      "_id": "bet_1786822821752_144",
+      "game_name": "Gali",
+      "bet_type": "JODI",
+      "number": 18,
+      "bet_amount": 10,
+      "potential_payout": 950,
+      "win_amount": 0,
+      "status": "pending",
+      "created_at": "2026-08-15T19:40:21.753Z"
+    },
+    {
+      "_id": "bet_1786822816896_181",
+      "game_name": "Gali",
+      "bet_type": "JODI",
+      "number": 8,
+      "bet_amount": 10,
+      "potential_payout": 950,
+      "win_amount": 0,
+      "status": "pending",
+      "created_at": "2026-08-15T19:40:16.896Z"
+    },
+    {
+      "_id": "bet_1786822725253_151",
+      "game_name": "Gali",
+      "bet_type": "JODI",
+      "number": 18,
+      "bet_amount": 10,
+      "potential_payout": 950,
+      "win_amount": 0,
+      "status": "pending",
+      "created_at": "2026-08-15T19:38:45.253Z"
+    },
+    {
+      "_id": "bet_1786822725253_900",
+      "game_name": "Gali",
+      "bet_type": "JODI",
+      "number": 2,
+      "bet_amount": 10,
+      "potential_payout": 950,
+      "win_amount": 0,
+      "status": "pending",
+      "created_at": "2026-08-15T19:38:45.253Z"
+    }
+  ],
+  "declaredResultsMap": {},
+  "gameSchedulesStore": {
+    "Desawar": {
+      "name": "Desawar",
+      "open": "05:00 AM IST",
+      "close": "04:00 AM IST",
+      "result": "06:00 AM IST",
+      "openHour": 5,
+      "openMinute": 0,
+      "closeHour": 4,
+      "closeMinute": 0,
+      "resultHour": 6,
+      "resultMinute": 0
+    },
+    "Shiv Parwati": {
+      "name": "Shiv Parwati",
+      "open": "04:00 AM IST",
+      "close": "12:00 PM IST",
+      "result": "12:40 PM IST",
+      "openHour": 4,
+      "openMinute": 0,
+      "closeHour": 12,
+      "closeMinute": 0,
+      "resultHour": 12,
+      "resultMinute": 40
+    },
+    "Delhi Bazar": {
+      "name": "Delhi Bazar",
+      "open": "04:00 AM IST",
+      "close": "02:45 PM IST",
+      "result": "03:20 PM IST",
+      "openHour": 4,
+      "openMinute": 0,
+      "closeHour": 14,
+      "closeMinute": 45,
+      "resultHour": 15,
+      "resultMinute": 20
+    },
+    "Dubai Market": {
+      "name": "Dubai Market",
+      "open": "04:00 AM IST",
+      "close": "04:00 PM IST",
+      "result": "04:00 PM IST",
+      "openHour": 4,
+      "openMinute": 0,
+      "closeHour": 16,
+      "closeMinute": 0,
+      "resultHour": 16,
+      "resultMinute": 0
+    },
+    "Shree Ganesh": {
+      "name": "Shree Ganesh",
+      "open": "04:00 AM IST",
+      "close": "04:30 PM IST",
+      "result": "04:50 PM IST",
+      "openHour": 4,
+      "openMinute": 0,
+      "closeHour": 16,
+      "closeMinute": 30,
+      "resultHour": 16,
+      "resultMinute": 50
+    },
+    "Faridabad": {
+      "name": "Faridabad",
+      "open": "04:00 AM IST",
+      "close": "05:40 PM IST",
+      "result": "06:20 PM IST",
+      "openHour": 4,
+      "openMinute": 0,
+      "closeHour": 17,
+      "closeMinute": 40,
+      "resultHour": 18,
+      "resultMinute": 20
+    },
+    "Ghaziabad": {
+      "name": "Ghaziabad",
+      "open": "04:00 AM IST",
+      "close": "09:30 PM IST",
+      "result": "10:10 PM IST",
+      "openHour": 4,
+      "openMinute": 0,
+      "closeHour": 21,
+      "closeMinute": 30,
+      "resultHour": 22,
+      "resultMinute": 10
+    },
+    "Gali": {
+      "name": "Gali",
+      "open": "04:00 AM IST",
+      "close": "11:30 PM IST",
+      "result": "11:59 PM IST",
+      "openHour": 4,
+      "openMinute": 0,
+      "closeHour": 23,
+      "closeMinute": 30,
+      "resultHour": 23,
+      "resultMinute": 59
+    }
+  }
+}

@@ -1,0 +1,206 @@
+const { userWalletStore, registeredUsers } = require('../store');
+const { formatDateKey } = require('../historicalChartStore');
+
+// @desc    Register a new user
+// @route   POST /api/user/register
+const registerUser = async (req, res) => {
+  const { name, mobile, password } = req.body;
+  if (!mobile) {
+    return res.status(400).json({ message: 'Mobile number is required' });
+  }
+
+  const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
+  let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+
+  if (user) {
+    if (name && name.trim().length > 0 && name !== 'User') {
+      user.name = name.trim();
+    }
+    console.log(`[Registration] Existing user logged in: ${user.name} (${user.mobile})`);
+    return res.json({ success: true, message: 'User logged in successfully', user });
+  }
+
+  const newUser = {
+    id: `usr_${Date.now()}`,
+    name: (name && name.trim().length > 0) ? name.trim() : `User ${cleanMobile.slice(-4)}`,
+    mobile: cleanMobile,
+    password: password || '123',
+    balance: 0.00,
+    status: 'Active',
+    createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    createdDateKey: formatDateKey(new Date())
+  };
+
+  registeredUsers.push(newUser);
+  userWalletStore.name = newUser.name;
+  userWalletStore.mobile = newUser.mobile;
+  userWalletStore.balance = newUser.balance;
+
+  const { saveDiskStore } = require('../store');
+  saveDiskStore();
+
+  console.log(`[Registration] New user created & added to Admin Directory: ${newUser.name} (+91 ${newUser.mobile})`);
+  res.status(201).json({ success: true, message: 'Account registered successfully', user: newUser });
+};
+
+// @desc    Login existing user
+// @route   POST /api/user/login
+const loginUser = async (req, res) => {
+  const { mobile, password } = req.body;
+  if (!mobile) {
+    return res.status(400).json({ message: 'Mobile number is required' });
+  }
+
+  const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
+  let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+
+  if (!user) {
+    // Auto-create user if logging in after OTP verification
+    user = {
+      id: `usr_${Date.now()}`,
+      name: `User ${cleanMobile.slice(-4)}`,
+      mobile: cleanMobile,
+      password: password || '123',
+      balance: 0.00,
+      status: 'Active',
+      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    registeredUsers.push(user);
+    const { saveDiskStore } = require('../store');
+    saveDiskStore();
+    console.log(`[Login] Auto-registered new user to Admin Directory: ${user.name} (+91 ${user.mobile})`);
+  }
+
+  res.json({ success: true, message: 'Login successful', user });
+};
+
+// @desc    Get user profile
+// @route   GET /api/user/profile
+const getUserProfile = async (req, res) => {
+  const { mobile } = req.query;
+  let targetUser = null;
+  if (mobile && mobile.trim().length > 0) {
+    const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
+    targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+  }
+  if (!targetUser) {
+    targetUser = registeredUsers.find(u => u.mobile.includes('7027709695') || u.name.toLowerCase().includes('yogi')) || registeredUsers[registeredUsers.length - 1];
+  }
+  if (targetUser) return res.json(targetUser);
+  res.json({ name: userWalletStore.name, mobile: userWalletStore.mobile, balance: userWalletStore.balance });
+};
+
+// @desc    Get live wallet balance
+// @route   GET /api/user/wallet/balance
+const getWalletBalance = async (req, res) => {
+  const { mobile } = req.query;
+  let targetUser = null;
+  if (mobile && mobile.trim().length > 0) {
+    const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
+    targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+  }
+  if (!targetUser) {
+    targetUser = registeredUsers.find(u => u.mobile.includes('7027709695') || u.name.toLowerCase().includes('yogi')) || registeredUsers[registeredUsers.length - 1];
+  }
+
+  const currentBal = targetUser ? targetUser.balance : (userWalletStore.balance || 0);
+  res.json({ balance: currentBal });
+};
+
+// @desc    Update wallet balance
+// @route   POST /api/user/wallet/balance
+const updateWalletBalance = async (req, res) => {
+  const { amount, mobile } = req.body;
+  const val = parseFloat(amount);
+  if (!isNaN(val)) {
+    let targetUser = null;
+    if (mobile) {
+      const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
+      targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+    }
+    if (!targetUser && registeredUsers.length > 0) {
+      targetUser = registeredUsers[0];
+    }
+
+    if (targetUser) {
+      targetUser.balance = val;
+    }
+    userWalletStore.balance = val;
+
+    const { saveDiskStore } = require('../store');
+    saveDiskStore();
+  }
+  res.json({ balance: userWalletStore.balance });
+};
+
+// @desc    Get transaction history
+// @route   GET /api/user/wallet/transactions
+const getTransactions = async (req, res) => {
+  res.json([]);
+};
+
+// @desc    Submit withdrawal request
+// @route   POST /api/user/withdraw/request
+const requestWithdrawal = async (req, res) => {
+  const { amount } = req.body;
+  res.json({ success: true, message: 'Withdrawal request submitted for review' });
+};
+
+// @desc    Send SMS OTP
+// @route   POST /api/user/send-otp
+const sendSmsOtp = async (req, res) => {
+  const { mobile } = req.body;
+  if (!mobile) {
+    return res.status(400).json({ message: 'Mobile number is required' });
+  }
+
+  const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
+  const generatedOtp = "123456";
+
+  console.log(`[OTP Manager] Set fixed OTP 123456 for +91 ${cleanMobile}`);
+  res.json({ success: true, message: 'OTP generated successfully', otp: generatedOtp });
+};
+
+// @desc    Verify SMS OTP
+// @route   POST /api/user/verify-otp
+const verifySmsOtp = async (req, res) => {
+  const { mobile, otp } = req.body;
+  if (!mobile || !otp) {
+    return res.status(400).json({ message: 'Mobile number and OTP code are required' });
+  }
+
+  const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
+
+  if (otp.trim() === '123456') {
+    // Ensure user is added to registeredUsers store
+    let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+    if (!user) {
+      user = {
+        id: `usr_${Date.now()}`,
+        name: `User ${cleanMobile.slice(-4)}`,
+        mobile: cleanMobile,
+        password: '123',
+        balance: 0.00,
+        status: 'Active',
+        createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      registeredUsers.push(user);
+      console.log(`[OTP Verified] Registered new user to Admin Directory: ${user.name} (+91 ${user.mobile})`);
+    }
+    return res.json({ success: true, message: 'OTP verified successfully', user });
+  }
+
+  return res.status(400).json({ message: 'Invalid OTP code! Please enter 123456.' });
+};
+
+module.exports = {
+  registerUser,
+  loginUser,
+  getUserProfile,
+  getWalletBalance,
+  updateWalletBalance,
+  getTransactions,
+  requestWithdrawal,
+  sendSmsOtp,
+  verifySmsOtp
+};
