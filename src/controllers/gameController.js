@@ -22,7 +22,16 @@ const placeBet = async (req, res) => {
     return res.status(400).json({ message: 'No bets provided' });
   }
 
-  const validGameNames = ['Gali', 'Ghaziabad', 'Faridabad', 'Desawar'];
+  const validGameNames = [
+    'Desawar',
+    'Shiv Parwati',
+    'Delhi Bazar',
+    'Dubai Market',
+    'Shree Ganesh',
+    'Faridabad',
+    'Ghaziabad',
+    'Gali'
+  ];
   const targetGame = validGameNames.includes(game_name) ? game_name : 'Gali';
 
   let totalStaked = 0;

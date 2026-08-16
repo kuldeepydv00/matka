@@ -49,10 +49,14 @@ const getUsers = async (req, res) => {
 // @route   GET /api/admin/matrix
 const getBetMatrix = async (req, res) => {
   const matrix = {
-    Gali: {},
-    Ghaziabad: {},
-    Faridabad: {},
-    Desawar: {}
+    "Desawar": {},
+    "Shiv Parwati": {},
+    "Delhi Bazar": {},
+    "Dubai Market": {},
+    "Shree Ganesh": {},
+    "Faridabad": {},
+    "Ghaziabad": {},
+    "Gali": {}
   };
 
   memoryBets.forEach(bet => {
