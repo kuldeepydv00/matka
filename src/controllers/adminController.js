@@ -461,6 +461,7 @@ module.exports = {
   getGameSchedules,
   updateGameSchedule,
   declareGameResult,
+  clearGameResult,
   getDeclaredResults,
   getDeposits,
   createDepositRequest,
