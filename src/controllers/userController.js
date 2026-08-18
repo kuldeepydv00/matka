@@ -103,11 +103,8 @@ const getUserProfile = async (req, res) => {
     const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
     targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
   }
-  if (!targetUser) {
-    targetUser = registeredUsers.find(u => u.mobile.includes('7027709695') || u.name.toLowerCase().includes('yogi')) || registeredUsers[registeredUsers.length - 1];
-  }
   if (targetUser) return res.json(targetUser);
-  res.json({ name: userWalletStore.name, mobile: userWalletStore.mobile, balance: userWalletStore.balance });
+  res.json({ name: 'User', mobile: mobile || '', balance: 0.00 });
 };
 
 // @desc    Get live wallet balance
@@ -119,11 +116,8 @@ const getWalletBalance = async (req, res) => {
     const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
     targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
   }
-  if (!targetUser) {
-    targetUser = registeredUsers.find(u => u.mobile.includes('7027709695') || u.name.toLowerCase().includes('yogi')) || registeredUsers[registeredUsers.length - 1];
-  }
 
-  const currentBal = targetUser ? targetUser.balance : (userWalletStore.balance || 0);
+  const currentBal = targetUser ? (targetUser.balance || 0.00) : 0.00;
   res.json({ balance: currentBal });
 };
 
