@@ -9,9 +9,11 @@ const {
   getTransactions, 
   requestWithdrawal,
   sendSmsOtp,
-  verifySmsOtp
+  verifySmsOtp,
+  checkUserExists
 } = require('../controllers/userController');
 
+router.get('/check', checkUserExists);
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/send-otp', sendSmsOtp);

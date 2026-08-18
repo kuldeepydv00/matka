@@ -193,6 +193,31 @@ const verifySmsOtp = async (req, res) => {
   return res.status(400).json({ message: 'Invalid OTP code! Please enter 123456.' });
 };
 
+// @desc    Check if a mobile number is already registered
+// @route   GET /api/user/check
+const checkUserExists = async (req, res) => {
+  const { mobile } = req.query;
+  if (!mobile) {
+    return res.json({ exists: false });
+  }
+
+  const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
+  const user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+
+  if (user) {
+    return res.json({
+      exists: true,
+      user: {
+        name: user.name,
+        mobile: user.mobile,
+        balance: user.balance || 0.00
+      }
+    });
+  }
+
+  return res.json({ exists: false });
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -202,5 +227,6 @@ module.exports = {
   getTransactions,
   requestWithdrawal,
   sendSmsOtp,
-  verifySmsOtp
+  verifySmsOtp,
+  checkUserExists
 };
