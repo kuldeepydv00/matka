@@ -214,10 +214,46 @@ const declareGameResult = async (req, res) => {
   });
 };
 
-// @desc    Get declared results
+// Helper to check if a game is currently in its open betting window (IST)
+const isGameInOpenWindowServer = (gameName) => {
+  const sched = gameSchedulesStore[gameName];
+  if (!sched || !sched.open || !sched.close) return false;
+
+  const now = new Date();
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const istDate = new Date(utc + (3600000 * 5.5)); // IST UTC+5:30
+  const currentMinutes = istDate.getHours() * 60 + istDate.getMinutes();
+
+  const parseTime = (str) => {
+    const match = str.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (!match) return 0;
+    let h = parseInt(match[1]);
+    const m = parseInt(match[2]);
+    const ampm = match[3].toUpperCase();
+    if (ampm === 'PM' && h < 12) h += 12;
+    if (ampm === 'AM' && h === 12) h = 0;
+    return h * 60 + m;
+  };
+
+  const openM = parseTime(sched.open);
+  const closeM = parseTime(sched.close);
+
+  if (gameName === 'Desawar') {
+    return currentMinutes >= openM || currentMinutes < closeM;
+  }
+  return currentMinutes >= openM && currentMinutes < closeM;
+};
+
+// @desc    Get declared results (Auto-filters out previous day results during open window)
 // @route   GET /api/admin/declared-results
 const getDeclaredResults = async (req, res) => {
-  res.json(declaredResultsMap);
+  const activeResults = {};
+  Object.keys(declaredResultsMap).forEach(game => {
+    if (!isGameInOpenWindowServer(game)) {
+      activeResults[game] = declaredResultsMap[game];
+    }
+  });
+  res.json(activeResults);
 };
 
 // @desc    Get deposit requests
