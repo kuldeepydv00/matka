@@ -202,7 +202,26 @@ const checkUserExists = async (req, res) => {
   }
 
   const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
-  const user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+  let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+
+  if (!user) {
+    try {
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState === 1) {
+        const User = require('../models/User');
+        const dbUser = await User.findOne({ mobile: cleanMobile });
+        if (dbUser) {
+          user = {
+            id: dbUser._id,
+            name: dbUser.name || dbUser.username || `User ${cleanMobile.slice(-4)}`,
+            mobile: dbUser.mobile,
+            balance: dbUser.wallet_balance || 0.00
+          };
+          registeredUsers.push(user);
+        }
+      }
+    } catch (e) { }
+  }
 
   if (user) {
     return res.json({
