@@ -92,6 +92,8 @@ let gameSchedulesStore = {
   }
 };
 
+const { chartRecords } = require('./historicalChartStore');
+
 function saveDiskStore() {
   try {
     const data = {
@@ -101,7 +103,8 @@ function saveDiskStore() {
       memoryWithdrawals,
       memoryBets,
       declaredResultsMap,
-      gameSchedulesStore
+      gameSchedulesStore,
+      chartRecords
     };
     fs.writeFileSync(STORE_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
@@ -121,6 +124,7 @@ function loadDiskStore() {
       if (data.memoryBets && Array.isArray(data.memoryBets)) memoryBets.length = 0, memoryBets.push(...data.memoryBets);
       if (data.declaredResultsMap) Object.assign(declaredResultsMap, data.declaredResultsMap);
       if (data.gameSchedulesStore) Object.assign(gameSchedulesStore, data.gameSchedulesStore);
+      if (data.chartRecords) Object.assign(chartRecords, data.chartRecords);
       console.log(`[Disk Store] Successfully loaded disk data! Registered users: ${registeredUsers.length}`);
     }
   } catch (err) {

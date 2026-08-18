@@ -160,6 +160,19 @@ const declareGameResult = async (req, res) => {
     if (game_name === 'Disawer') chartRecords[dateKey]['Desawar'] = resultStr;
   });
 
+  // Save declared result into MongoDB Atlas for permanent cloud persistence
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const ResultRecord = require('../models/ResultRecord');
+      ResultRecord.findOneAndUpdate(
+        { game_name, date_key: istKey },
+        { winning_number: resultStr, declared_at: new Date() },
+        { upsert: true, new: true }
+      ).then(() => console.log(`[MongoDB] Saved result for ${game_name}: ${resultStr}`)).catch(e => console.error('[MongoDB Error]', e));
+    }
+  } catch (e) { }
+
   saveDiskStore();
 
   // Auto-calculate payouts (95x for Jodi/Crossing, 9.5x for Haroof Ander/Bahar)
