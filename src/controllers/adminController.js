@@ -454,6 +454,33 @@ const updateUserWallet = async (req, res) => {
   res.status(404).json({ success: false, message: 'User not found' });
 };
 
+// @desc    Get promotional banner configuration
+// @route   GET /api/game/banner
+const getBannerConfig = async (req, res) => {
+  const { bannerConfig } = require('../store');
+  res.json(bannerConfig);
+};
+
+// @desc    Update promotional banner configuration
+// @route   POST /api/admin/update-banner
+const updateBannerConfig = async (req, res) => {
+  const { bannerConfig, saveDiskStore } = require('../store');
+  const { enabled, title, subtitle, referralText, commissionText, minDeposit, minWithdrawal, imageUrl } = req.body;
+
+  if (typeof enabled === 'boolean') bannerConfig.enabled = enabled;
+  if (title !== undefined) bannerConfig.title = title;
+  if (subtitle !== undefined) bannerConfig.subtitle = subtitle;
+  if (referralText !== undefined) bannerConfig.referralText = referralText;
+  if (commissionText !== undefined) bannerConfig.commissionText = commissionText;
+  if (minDeposit !== undefined) bannerConfig.minDeposit = minDeposit;
+  if (minWithdrawal !== undefined) bannerConfig.minWithdrawal = minWithdrawal;
+  if (imageUrl !== undefined) bannerConfig.imageUrl = imageUrl;
+
+  saveDiskStore();
+  console.log(`[Admin Banner] Updated banner config: ${JSON.stringify(bannerConfig)}`);
+  res.json({ success: true, message: 'Banner configuration updated successfully', bannerConfig });
+};
+
 module.exports = {
   getStats,
   getUsers,
@@ -471,5 +498,7 @@ module.exports = {
   createWithdrawalRequest,
   approveWithdrawal,
   rejectWithdrawal,
-  updateUserWallet
+  updateUserWallet,
+  getBannerConfig,
+  updateBannerConfig
 };

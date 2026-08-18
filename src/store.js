@@ -17,6 +17,17 @@ let memoryWithdrawals = [];
 let memoryBets = [];
 let declaredResultsMap = {};
 
+let bannerConfig = {
+  enabled: true,
+  title: '95X MATKA SATTA',
+  subtitle: 'आपका भरोसा, हमारी पहचान',
+  referralText: 'केवल 5 प्लेइंग यूजर को रिफर करें और पाएं ₹500 बोनस',
+  commissionText: '4% लाइफटाइम कमिशन आपकी टीम के हर दांव पर',
+  minDeposit: '100',
+  minWithdrawal: '300',
+  imageUrl: ''
+};
+
 let gameSchedulesStore = {
   "Desawar": {
     name: "Desawar",
@@ -104,7 +115,8 @@ function saveDiskStore() {
       memoryBets,
       declaredResultsMap,
       gameSchedulesStore,
-      chartRecords
+      chartRecords,
+      bannerConfig
     };
     fs.writeFileSync(STORE_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
@@ -125,6 +137,7 @@ function loadDiskStore() {
       if (data.declaredResultsMap) Object.assign(declaredResultsMap, data.declaredResultsMap);
       if (data.gameSchedulesStore) Object.assign(gameSchedulesStore, data.gameSchedulesStore);
       if (data.chartRecords) Object.assign(chartRecords, data.chartRecords);
+      if (data.bannerConfig) Object.assign(bannerConfig, data.bannerConfig);
       console.log(`[Disk Store] Successfully loaded disk data! Registered users: ${registeredUsers.length}`);
     }
   } catch (err) {
@@ -143,5 +156,6 @@ module.exports = {
   memoryBets,
   declaredResultsMap,
   gameSchedulesStore,
+  bannerConfig,
   saveDiskStore
 };

@@ -17,9 +17,13 @@ const {
   declareGameResult,
   clearGameResult,
   getDeclaredResults,
-  updateUserWallet
+  updateUserWallet,
+  getBannerConfig,
+  updateBannerConfig
 } = require('../controllers/adminController');
 
+router.get('/banner', getBannerConfig);
+router.post('/update-banner', updateBannerConfig);
 router.get('/stats', getStats);
 router.get('/users', getUsers);
 router.get('/matrix', getBetMatrix);
