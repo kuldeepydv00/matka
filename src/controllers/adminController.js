@@ -59,10 +59,18 @@ const getBetMatrix = async (req, res) => {
     "Gali": {}
   };
 
+  const now = new Date();
+  const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+
   memoryBets.forEach(bet => {
-    if (bet.game_name && bet.number) {
-      if (!matrix[bet.game_name]) matrix[bet.game_name] = {};
-      matrix[bet.game_name][bet.number] = (matrix[bet.game_name][bet.number] || 0) + (bet.bet_amount || 0);
+    if (bet.game_name && bet.number !== undefined && bet.status === 'pending') {
+      const betDate = bet.created_at ? new Date(bet.created_at) : null;
+      if (!betDate || betDate >= twentyFourHoursAgo) {
+        const game = bet.game_name;
+        const numKey = bet.number;
+        if (!matrix[game]) matrix[game] = {};
+        matrix[game][numKey] = (matrix[game][numKey] || 0) + (bet.bet_amount || 0);
+      }
     }
   });
 
@@ -180,7 +188,7 @@ const declareGameResult = async (req, res) => {
   const baharDigit = parseInt(resultStr.charAt(1));
 
   memoryBets.forEach(bet => {
-    if (bet.game_name === game_name) {
+    if (bet.game_name === game_name && bet.status === 'pending') {
       let isWin = false;
       let payout = 0;
 
@@ -205,9 +213,28 @@ const declareGameResult = async (req, res) => {
       if (isWin) {
         bet.status = 'won';
         bet.winAmount = payout;
-        userWalletStore.balance += payout;
-        if (registeredUsers.length > 0) {
-          registeredUsers[0].balance += payout;
+        
+        // Find exact user who placed the bet by mobile or user_id
+        const userMobile = (bet.user || bet.mobile || bet.user_id || '').replace(/[^0-9]/g, '').slice(-10);
+        let targetUser = registeredUsers.find(u => u.mobile && u.mobile.replace(/[^0-9]/g, '').slice(-10) === userMobile);
+        if (!targetUser && registeredUsers.length > 0) {
+          targetUser = registeredUsers[0];
+        }
+        if (targetUser) {
+          targetUser.balance = (targetUser.balance || 0) + payout;
+          userWalletStore.balance = targetUser.balance;
+
+          // Sync winning balance to MongoDB Atlas
+          try {
+            const mongoose = require('mongoose');
+            if (mongoose.connection.readyState === 1) {
+              const User = require('../models/User');
+              User.findOneAndUpdate(
+                { mobile: targetUser.mobile },
+                { balance: targetUser.balance }
+              ).catch(e => console.error('[MongoDB Win Sync Error]', e));
+            }
+          } catch (e) { }
         }
       } else {
         bet.status = 'lost';
