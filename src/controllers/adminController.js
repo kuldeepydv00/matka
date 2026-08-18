@@ -102,34 +102,12 @@ const updateGameSchedule = async (req, res) => {
   });
 };
 
-// Helper for schedule validation
+// Helper for schedule validation:
+// Result can be declared ANYTIME after betting window closes until next betting window opens!
 const isResultTimeReachedServer = (gameName) => {
-  const sched = gameSchedulesStore[gameName];
-  if (!sched || !sched.result) return true;
-
-  const now = new Date();
-  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-  const istDate = new Date(utc + (3600000 * 5.5)); // IST UTC+5:30
-  const currentMinutes = istDate.getHours() * 60 + istDate.getMinutes();
-
-  // Parse result time string (e.g., "09:40 PM IST")
-  const timeMatch = sched.result.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-  if (!timeMatch) return true;
-
-  let h = parseInt(timeMatch[1]);
-  const m = parseInt(timeMatch[2]);
-  const ampm = timeMatch[3].toUpperCase();
-
-  if (ampm === 'PM' && h < 12) h += 12;
-  if (ampm === 'AM' && h === 12) h = 0;
-
-  const targetMinutes = h * 60 + m;
-
-  if (gameName === 'Desawar') {
-    return currentMinutes >= targetMinutes && currentMinutes < (6 * 60);
-  }
-
-  return currentMinutes >= targetMinutes;
+  const isOpen = isGameInOpenWindowServer(gameName);
+  // If betting window is closed, Admin can declare result anytime!
+  return !isOpen;
 };
 
 // @desc    Declare game result
@@ -143,13 +121,13 @@ const declareGameResult = async (req, res) => {
     return res.status(400).json({ success: false, message: 'Valid game name and winning number (00-99) required' });
   }
 
-  // Enforce Schedule: Check if result time in IST has been reached
+  // Enforce Schedule: Check if betting window has closed
   if (!force && !isResultTimeReachedServer(game_name)) {
     const sched = gameSchedulesStore[game_name];
-    const timeStr = sched ? sched.result : 'designated result time';
+    const timeStr = sched ? sched.close : 'closing time';
     return res.status(400).json({
       success: false,
-      message: `⏳ Cannot declare result for ${game_name} yet! Result time is at ${timeStr}. Please wait until result time.`
+      message: `⏳ Cannot declare result for ${game_name} while betting is open! Please wait until betting window closes at ${timeStr}.`
     });
   }
 
