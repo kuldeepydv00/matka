@@ -110,25 +110,15 @@ const isResultTimeReachedServer = (gameName) => {
   return !isOpen;
 };
 
-// @desc    Declare game result
+// @desc    Declare game result (Instant 24/7 Admin Control)
 // @route   POST /api/admin/declare-result
 const declareGameResult = async (req, res) => {
-  const { game_name, number, winning_number, force } = req.body;
+  const { game_name, number, winning_number } = req.body;
   const rawNum = number !== undefined ? number : winning_number;
   const numVal = parseInt(rawNum);
 
   if (!game_name || isNaN(numVal)) {
     return res.status(400).json({ success: false, message: 'Valid game name and winning number (00-99) required' });
-  }
-
-  // Enforce Schedule: Check if betting window has closed
-  if (!force && !isResultTimeReachedServer(game_name)) {
-    const sched = gameSchedulesStore[game_name];
-    const timeStr = sched ? sched.close : 'closing time';
-    return res.status(400).json({
-      success: false,
-      message: `⏳ Cannot declare result for ${game_name} while betting is open! Please wait until betting window closes at ${timeStr}.`
-    });
   }
 
   declaredResultsMap[game_name] = numVal;

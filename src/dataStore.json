@@ -206,7 +206,9 @@
       "created_at": "2026-08-15T19:38:45.253Z"
     }
   ],
-  "declaredResultsMap": {},
+  "declaredResultsMap": {
+    "Delhi Bazar": 12
+  },
   "gameSchedulesStore": {
     "Desawar": {
       "name": "Desawar",
@@ -8000,7 +8002,8 @@
       "Faridabad": "81",
       "Desawar": "65",
       "Disawer": "65",
-      "Shri Ganesh": "35"
+      "Shri Ganesh": "35",
+      "Delhi Bazar": "12"
     }
   },
   "bannerConfig": {
