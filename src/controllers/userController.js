@@ -39,6 +39,26 @@ const registerUser = async (req, res) => {
   const { saveDiskStore } = require('../store');
   saveDiskStore();
 
+  // Save new registered user into MongoDB Atlas Database
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const User = require('../models/User');
+      User.findOneAndUpdate(
+        { mobile: cleanMobile },
+        {
+          name: newUser.name,
+          username: newUser.name,
+          mobile: cleanMobile,
+          password: newUser.password,
+          wallet_balance: 0.00
+        },
+        { upsert: true, new: true }
+      ).then(() => console.log(`[MongoDB] New user saved to Cloud Database: ${newUser.name} (+91 ${cleanMobile})`))
+       .catch(e => console.error('[MongoDB User Creation Error]', e));
+    }
+  } catch (e) { }
+
   console.log(`[Registration] New user created & added to Admin Directory: ${newUser.name} (+91 ${newUser.mobile})`);
   res.status(201).json({ success: true, message: 'Account registered successfully', user: newUser });
 };
