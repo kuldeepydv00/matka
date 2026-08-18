@@ -227,6 +227,27 @@ const declareGameResult = async (req, res) => {
   });
 };
 
+// @desc    Clear / Reset declared result for a game
+// @route   POST /api/admin/clear-result
+const clearGameResult = async (req, res) => {
+  const { game_name } = req.body;
+  if (!game_name) {
+    return res.status(400).json({ success: false, message: 'Game name is required' });
+  }
+
+  delete declaredResultsMap[game_name];
+  if (game_name === 'Desawar') delete declaredResultsMap['Disawer'];
+  if (game_name === 'Disawer') delete declaredResultsMap['Desawar'];
+
+  saveDiskStore();
+
+  res.json({
+    success: true,
+    message: `Result reset/cleared for ${game_name}`,
+    declaredResults: declaredResultsMap
+  });
+};
+
 // Helper to check if a game is currently in its open betting window (IST)
 const isGameInOpenWindowServer = (gameName) => {
   const sched = gameSchedulesStore[gameName];

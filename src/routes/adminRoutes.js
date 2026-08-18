@@ -15,6 +15,7 @@ const {
   approveWithdrawal,
   rejectWithdrawal,
   declareGameResult,
+  clearGameResult,
   getDeclaredResults,
   updateUserWallet
 } = require('../controllers/adminController');
@@ -26,6 +27,7 @@ router.get('/schedules', getGameSchedules);
 router.post('/update-schedule', updateGameSchedule);
 router.post('/update-user-wallet', updateUserWallet);
 router.post('/declare-result', declareGameResult);
+router.post('/clear-result', clearGameResult);
 router.get('/declared-results', getDeclaredResults);
 
 // Deposits routes
