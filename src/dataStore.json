@@ -207,7 +207,9 @@
     }
   ],
   "declaredResultsMap": {
-    "Delhi Bazar": 12
+    "Faridabad": 59,
+    "Shree Ganesh": 2,
+    "Delhi Bazar": 5
   },
   "gameSchedulesStore": {
     "Desawar": {
@@ -7999,11 +8001,17 @@
     "2026-08-19": {
       "Gali": "47",
       "Ghaziabad": "93",
-      "Faridabad": "81",
+      "Faridabad": "59",
       "Desawar": "65",
       "Disawer": "65",
       "Shri Ganesh": "35",
-      "Delhi Bazar": "12"
+      "Delhi Bazar": "05",
+      "Shree Ganesh": "02"
+    },
+    "2026-08-20": {
+      "Faridabad": "59",
+      "Shree Ganesh": "02",
+      "Delhi Bazar": "05"
     }
   },
   "bannerConfig": {
