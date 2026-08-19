@@ -47,6 +47,8 @@ const getUsers = async (req, res) => {
 
 // @desc    Get live matrix of total bet volume per number (1-100) for each game
 // @route   GET /api/admin/matrix
+// @desc    Get real-time bet matrix (1-100) per game for Admin Panel
+// @route   GET /api/admin/matrix
 const getBetMatrix = async (req, res) => {
   const matrix = {
     "Desawar": {},
@@ -59,20 +61,40 @@ const getBetMatrix = async (req, res) => {
     "Gali": {}
   };
 
-  const now = new Date();
-  const twentyFourHoursAgo = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-
+  // Process memory bets
   memoryBets.forEach(bet => {
-    if (bet.game_name && bet.number !== undefined && bet.status === 'pending') {
-      const betDate = bet.created_at ? new Date(bet.created_at) : null;
-      if (!betDate || betDate >= twentyFourHoursAgo) {
-        const game = bet.game_name;
-        const numKey = bet.number;
-        if (!matrix[game]) matrix[game] = {};
-        matrix[game][numKey] = (matrix[game][numKey] || 0) + (bet.bet_amount || 0);
-      }
+    if (bet.game_name && bet.number !== undefined && (bet.status === 'pending' || !bet.status)) {
+      let game = bet.game_name;
+      if (game === 'Disawer') game = 'Desawar';
+      if (game === 'Shri Ganesh') game = 'Shree Ganesh';
+
+      const numKey = String(bet.number).padStart(2, '0');
+      if (!matrix[game]) matrix[game] = {};
+      matrix[game][numKey] = (matrix[game][numKey] || 0) + (parseFloat(bet.bet_amount) || 0);
     }
   });
+
+  // Sync bets stored in MongoDB Atlas cloud
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const Bet = require('../models/Bet');
+      const dbBets = await Bet.find({ status: 'pending' });
+      dbBets.forEach(bet => {
+        if (bet.game_name && bet.number !== undefined) {
+          let game = bet.game_name;
+          if (game === 'Disawer') game = 'Desawar';
+          if (game === 'Shri Ganesh') game = 'Shree Ganesh';
+
+          const numKey = String(bet.number).padStart(2, '0');
+          if (!matrix[game]) matrix[game] = {};
+          matrix[game][numKey] = (matrix[game][numKey] || 0) + (parseFloat(bet.bet_amount) || 0);
+        }
+      });
+    }
+  } catch (e) {
+    console.error('[MongoDB Matrix Error]', e);
+  }
 
   res.json(matrix);
 };
