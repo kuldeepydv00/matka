@@ -122,7 +122,7 @@ const getResults = async (req, res) => {
   res.json(sampleResults);
 };
 
-// @desc    Get date-wise chart results for all games (Historical 2024-2026 & Live)
+// @desc    Get date-wise chart results for all games (Historical & Live from DB)
 // @route   GET /api/game/chart-results?date=YYYY-MM-DD
 // @access  Public
 const getChartResults = async (req, res) => {
@@ -132,24 +132,33 @@ const getChartResults = async (req, res) => {
   const istNow = new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000));
   const istKey = formatDateKey(istNow);
 
-  // Fetch existing record or default empty placeholders
-  const baseResults = chartRecords[reqDate] ? { ...chartRecords[reqDate] } : {
-    "Gali": "--",
-    "Ghaziabad": "--",
-    "Faridabad": "--",
-    "Desawar": "--",
-    "Disawer": "--",
-    "Shri Ganesh": "--"
-  };
+  // Default placeholders
+  const baseResults = chartRecords[reqDate] ? { ...chartRecords[reqDate] } : {};
 
-  // If queried date is today (UTC or IST), overlay live declared results from Admin Panel
+  // Query MongoDB Atlas for cloud records for the requested date
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const ResultRecord = require('../models/ResultRecord');
+      const dbRecords = await ResultRecord.find({ date_key: reqDate });
+      dbRecords.forEach(r => {
+        if (r.game_name && r.winning_number) {
+          baseResults[r.game_name] = r.winning_number;
+          if (r.game_name === 'Desawar') baseResults['Disawer'] = r.winning_number;
+        }
+      });
+    }
+  } catch (e) {
+    console.error('[MongoDB Chart Fetch Error]', e);
+  }
+
+  // If date is today, overlay memory declaredResultsMap
   if (reqDate === todayKey || reqDate === istKey) {
     Object.keys(declaredResultsMap).forEach(game => {
       if (declaredResultsMap[game] !== null && declaredResultsMap[game] !== undefined) {
         const valStr = String(declaredResultsMap[game]).padStart(2, '0');
         baseResults[game] = valStr;
         if (game === 'Desawar') baseResults['Disawer'] = valStr;
-        if (game === 'Disawer') baseResults['Desawar'] = valStr;
       }
     });
   }
