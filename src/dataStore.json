@@ -39,12 +39,22 @@
       "status": "Active",
       "createdAt": "10:23 PM",
       "createdDateKey": "2026-08-19"
+    },
+    {
+      "id": "usr_1787158840026",
+      "name": "kul",
+      "mobile": "1122222222",
+      "password": "123456",
+      "balance": 1000,
+      "status": "Active",
+      "createdAt": "10:30 PM",
+      "createdDateKey": "2026-08-19"
     }
   ],
   "userWalletStore": {
     "balance": 0,
-    "name": "Kuldeep Website",
-    "mobile": "9876543210"
+    "name": "kul",
+    "mobile": "1122222222"
   },
   "memoryDeposits": [
     {

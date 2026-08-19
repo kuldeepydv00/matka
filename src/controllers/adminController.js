@@ -441,6 +441,20 @@ const updateUserWallet = async (req, res) => {
       targetUser.balance = Math.max(0, (targetUser.balance || 0) - val);
     }
 
+    userWalletStore.balance = targetUser.balance;
+
+    // Sync updated wallet balance to MongoDB Atlas
+    try {
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState === 1) {
+        const User = require('../models/User');
+        User.findOneAndUpdate(
+          { mobile: targetUser.mobile },
+          { balance: targetUser.balance }
+        ).catch(e => console.error('[MongoDB Wallet Sync Error]', e));
+      }
+    } catch (e) { }
+
     saveDiskStore();
     console.log(`[Admin Wallet] Updated balance for ${targetUser.name} (${targetUser.mobile}): ${targetUser.balance}`);
     return res.json({ success: true, message: `Wallet updated for ${targetUser.name}`, newBalance: targetUser.balance });
