@@ -112,14 +112,30 @@ const getMyBets = async (req, res) => {
 // @desc    Get game results
 // @route   GET /api/game/results
 // @access  Public
+// @desc    Get live declared game results map
+// @route   GET /api/game/results
+// @access  Public
 const getResults = async (req, res) => {
-  const sampleResults = [
-    { game_name: "Faridabad", winning_number: 12, declared_at: "Today, 06:00 PM" },
-    { game_name: "Ghaziabad", winning_number: null, status: "Live", declared_at: "Pending" },
-    { game_name: "Gali", winning_number: 87, declared_at: "Yesterday, 11:30 PM" },
-    { game_name: "Desawar", winning_number: 45, declared_at: "Yesterday, 05:00 AM" }
-  ];
-  res.json(sampleResults);
+  const resultsObj = { ...declaredResultsMap };
+
+  // Query MongoDB Atlas ResultRecord for today's declared results
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const ResultRecord = require('../models/ResultRecord');
+      const todayKey = formatDateKey(new Date());
+      const dbRecords = await ResultRecord.find({ date_key: todayKey });
+      dbRecords.forEach(r => {
+        if (r.game_name && r.winning_number !== undefined && r.winning_number !== null) {
+          resultsObj[r.game_name] = r.winning_number;
+          if (r.game_name === 'Desawar') resultsObj['Disawer'] = r.winning_number;
+          if (r.game_name === 'Shree Ganesh') resultsObj['Shri Ganesh'] = r.winning_number;
+        }
+      });
+    }
+  } catch (e) {}
+
+  res.json(resultsObj);
 };
 
 // @desc    Get date-wise chart results for all games (Historical & Live from DB)
