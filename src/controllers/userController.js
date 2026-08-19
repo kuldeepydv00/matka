@@ -118,7 +118,8 @@ const getWalletBalance = async (req, res) => {
   }
 
   const currentBal = targetUser ? (targetUser.balance || 0.00) : 0.00;
-  res.json({ balance: currentBal });
+  const currentName = targetUser ? targetUser.name : null;
+  res.json({ balance: currentBal, name: currentName });
 };
 
 // @desc    Update wallet balance
