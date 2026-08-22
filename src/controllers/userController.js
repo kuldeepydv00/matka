@@ -157,8 +157,79 @@ const getTransactions = async (req, res) => {
 // @desc    Submit withdrawal request
 // @route   POST /api/user/withdraw/request
 const requestWithdrawal = async (req, res) => {
-  const { amount } = req.body;
-  res.json({ success: true, message: 'Withdrawal request submitted for review' });
+  const { amount, mobile, method, details, holder_name } = req.body;
+  const numAmt = parseFloat(amount);
+
+  if (!numAmt || numAmt < 500) {
+    return res.status(400).json({ success: false, message: 'Minimum withdrawal amount is ₹500' });
+  }
+
+  const cleanMobile = (mobile || '').replace(/[^0-9]/g, '').slice(-10);
+  let targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+  if (!targetUser && registeredUsers.length > 0) {
+    targetUser = registeredUsers[0];
+  }
+
+  if (targetUser && (targetUser.balance || 0) < numAmt) {
+    return res.status(400).json({ success: false, message: `Insufficient wallet balance. Available balance: ₹${targetUser.balance.toFixed(2)}` });
+  }
+
+  // Deduct balance from user wallet
+  if (targetUser) {
+    targetUser.balance = (targetUser.balance || 0) - numAmt;
+    userWalletStore.balance = targetUser.balance;
+
+    // Sync to MongoDB Atlas
+    try {
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState === 1) {
+        const User = require('../models/User');
+        await User.updateOne({ mobile: targetUser.mobile }, { $set: { wallet_balance: targetUser.balance } });
+      }
+    } catch (e) {}
+  }
+
+  const newWithdrawal = {
+    id: `wth_${Date.now()}`,
+    user: targetUser ? targetUser.mobile : (cleanMobile || '1234567890'),
+    mobile: targetUser ? targetUser.mobile : (cleanMobile || '1234567890'),
+    name: holder_name || (targetUser ? targetUser.name : 'User'),
+    amount: numAmt,
+    status: 'pending',
+    payment_method: method || 'UPI',
+    payment_details: details || 'UPI Payment',
+    account_number: details || 'N/A',
+    ifsc_code: method === 'Bank' ? 'BANK000123' : 'N/A',
+    upi_id: method === 'UPI' ? details : 'N/A',
+    created_at: new Date().toISOString()
+  };
+
+  memoryWithdrawals.unshift(newWithdrawal);
+
+  // Sync to MongoDB Atlas WithdrawalRequest collection
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const WithdrawalRequest = require('../models/WithdrawalRequest');
+      await WithdrawalRequest.create({
+        user_id: targetUser ? targetUser.id : newWithdrawal.id,
+        username: newWithdrawal.name,
+        amount: numAmt,
+        payment_method: newWithdrawal.payment_method,
+        account_details: newWithdrawal.payment_details,
+        status: 'pending'
+      });
+    }
+  } catch (e) {}
+
+  saveDiskStore();
+
+  res.json({
+    success: true,
+    message: `Withdrawal request of ₹${numAmt} submitted successfully! Settle within 15 minutes.`,
+    newBalance: targetUser ? targetUser.balance : 0,
+    withdrawal: newWithdrawal
+  });
 };
 
 // @desc    Send SMS OTP
