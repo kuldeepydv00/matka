@@ -45,7 +45,7 @@
       "name": "kul",
       "mobile": "1122222222",
       "password": "123456",
-      "balance": 1163,
+      "balance": 1123,
       "status": "Active",
       "createdAt": "10:30 PM",
       "createdDateKey": "2026-08-19"
@@ -271,6 +271,54 @@
     }
   ],
   "memoryBets": [
+    {
+      "_id": "bet_1787415976776_930",
+      "game_name": "Desawar",
+      "bet_type": "CROSSING",
+      "number": 22,
+      "bet_amount": 10,
+      "potential_payout": 950,
+      "win_amount": 0,
+      "status": "pending",
+      "user": "kul (1122222222)",
+      "created_at": "2026-08-22T16:26:16.776Z"
+    },
+    {
+      "_id": "bet_1787415976776_911",
+      "game_name": "Desawar",
+      "bet_type": "CROSSING",
+      "number": 21,
+      "bet_amount": 10,
+      "potential_payout": 950,
+      "win_amount": 0,
+      "status": "pending",
+      "user": "kul (1122222222)",
+      "created_at": "2026-08-22T16:26:16.776Z"
+    },
+    {
+      "_id": "bet_1787415976776_312",
+      "game_name": "Desawar",
+      "bet_type": "CROSSING",
+      "number": 12,
+      "bet_amount": 10,
+      "potential_payout": 950,
+      "win_amount": 0,
+      "status": "pending",
+      "user": "kul (1122222222)",
+      "created_at": "2026-08-22T16:26:16.776Z"
+    },
+    {
+      "_id": "bet_1787415976775_504",
+      "game_name": "Desawar",
+      "bet_type": "CROSSING",
+      "number": 11,
+      "bet_amount": 10,
+      "potential_payout": 950,
+      "win_amount": 0,
+      "status": "pending",
+      "user": "kul (1122222222)",
+      "created_at": "2026-08-22T16:26:16.776Z"
+    },
     {
       "_id": "bet_1787415618336_420",
       "game_name": "Desawar",
