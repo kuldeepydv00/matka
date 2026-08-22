@@ -45,7 +45,7 @@
       "name": "kul",
       "mobile": "1122222222",
       "password": "123456",
-      "balance": 1211,
+      "balance": 1163,
       "status": "Active",
       "createdAt": "10:30 PM",
       "createdDateKey": "2026-08-19"
@@ -271,6 +271,42 @@
     }
   ],
   "memoryBets": [
+    {
+      "_id": "bet_1787415618336_420",
+      "game_name": "Desawar",
+      "bet_type": "JODI",
+      "number": 24,
+      "bet_amount": 29,
+      "potential_payout": 2755,
+      "win_amount": 0,
+      "status": "pending",
+      "user": "kul (1122222222)",
+      "created_at": "2026-08-22T16:20:18.336Z"
+    },
+    {
+      "_id": "bet_1787415618336_604",
+      "game_name": "Desawar",
+      "bet_type": "JODI",
+      "number": 23,
+      "bet_amount": 9,
+      "potential_payout": 855,
+      "win_amount": 0,
+      "status": "pending",
+      "user": "kul (1122222222)",
+      "created_at": "2026-08-22T16:20:18.336Z"
+    },
+    {
+      "_id": "bet_1787415618336_397",
+      "game_name": "Desawar",
+      "bet_type": "JODI",
+      "number": 19,
+      "bet_amount": 10,
+      "potential_payout": 950,
+      "win_amount": 0,
+      "status": "pending",
+      "user": "kul (1122222222)",
+      "created_at": "2026-08-22T16:20:18.336Z"
+    },
     {
       "_id": "bet_1787415554556_386",
       "game_name": "Desawar",
