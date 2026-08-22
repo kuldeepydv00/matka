@@ -359,13 +359,21 @@ const getDeposits = async (req, res) => {
       const dbDeps = await DepositRequest.find().sort({ createdAt: -1 }).lean();
       if (dbDeps && dbDeps.length > 0) {
         dbDeps.forEach(d => {
-          if (!memoryDeposits.some(m => m._id && String(m._id) === String(d._id))) {
+          const utrKey = d.utr_number || d.utr;
+          const exists = memoryDeposits.some(m => 
+            (m._id && String(m._id) === String(d._id)) || 
+            (m.utr && utrKey && String(m.utr) === String(utrKey))
+          );
+          if (!exists) {
             memoryDeposits.unshift({
               _id: d._id,
               user: d.username || 'User',
+              username: d.username || 'User',
+              mobile: d.user_id || 'N/A',
               amount: d.amount,
               method: 'UPI / PhonePe',
-              utr: d.utr_number,
+              utr: utrKey || 'N/A',
+              utr_number: utrKey || 'N/A',
               status: d.status ? (d.status.charAt(0).toUpperCase() + d.status.slice(1)) : 'Pending',
               createdAt: d.createdAt ? new Date(d.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today'
             });
@@ -373,11 +381,14 @@ const getDeposits = async (req, res) => {
         });
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('[Admin Deposits Error]', e);
+  }
   res.json(memoryDeposits);
 };
 
 // @desc    Get withdrawal requests
+// @route   GET /api/admin/withdrawals
 const getWithdrawals = async (req, res) => {
   try {
     const mongoose = require('mongoose');
@@ -386,7 +397,11 @@ const getWithdrawals = async (req, res) => {
       const dbWths = await WithdrawalRequest.find().sort({ createdAt: -1 }).lean();
       if (dbWths && dbWths.length > 0) {
         dbWths.forEach(w => {
-          if (!memoryWithdrawals.some(m => (m.id && String(m.id) === String(w._id)) || (m._id && String(m._id) === String(w._id)))) {
+          const exists = memoryWithdrawals.some(m => 
+            (m.id && String(m.id) === String(w._id)) || 
+            (m._id && String(m._id) === String(w._id))
+          );
+          if (!exists) {
             memoryWithdrawals.unshift({
               id: w._id,
               _id: w._id,
@@ -406,7 +421,9 @@ const getWithdrawals = async (req, res) => {
         });
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('[Admin Withdrawals Error]', e);
+  }
   res.json(memoryWithdrawals);
 };
 
@@ -599,15 +616,46 @@ const updateBannerConfig = async (req, res) => {
   if (minWithdrawal !== undefined) bannerConfig.minWithdrawal = minWithdrawal;
   if (imageUrl !== undefined) bannerConfig.imageUrl = imageUrl;
 
-  saveDiskStore();
-  console.log(`[Admin Banner] Updated banner config: ${JSON.stringify(bannerConfig)}`);
-  res.json({ success: true, message: 'Banner configuration updated successfully', bannerConfig });
+// @desc    Get all placed bets for Admin Panel
+// @route   GET /api/admin/bets
+const getAdminBets = async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const Bet = require('../models/Bet');
+      const dbBets = await Bet.find({}).sort({ createdAt: -1 }).lean();
+      if (dbBets && dbBets.length > 0) {
+        dbBets.forEach(b => {
+          const exists = memoryBets.some(m => String(m._id || m.id) === String(b._id));
+          if (!exists) {
+            memoryBets.unshift({
+              _id: b._id,
+              id: b._id,
+              user: b.username || b.mobile || 'User',
+              mobile: b.mobile || 'N/A',
+              game_name: b.game_name,
+              number: b.number,
+              bet_amount: b.bet_amount,
+              potential_payout: b.potential_payout || (b.bet_amount * 95),
+              status: b.status || 'pending',
+              win_amount: b.win_amount || 0,
+              created_at: b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString()
+            });
+          }
+        });
+      }
+    }
+  } catch (e) {
+    console.error('[Admin Bets Error]', e);
+  }
+  res.json(memoryBets);
 };
 
 module.exports = {
   getStats,
   getUsers,
   getBetMatrix,
+  getAdminBets,
   getGameSchedules,
   updateGameSchedule,
   declareGameResult,

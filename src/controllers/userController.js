@@ -225,30 +225,28 @@ const getTransactions = async (req, res) => {
 };
 
 // @desc    Submit deposit request
+// @desc    Submit deposit request
 // @route   POST /api/user/deposit OR /api/user/deposit/request
 const submitDeposit = async (req, res) => {
   const { user, mobile, amount, method, utr } = req.body;
 
   const cleanMobile = (mobile || '').replace(/[^0-9]/g, '').slice(-10);
   let targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
-  if (!targetUser && registeredUsers.length > 0) {
-    targetUser = registeredUsers[0];
-  }
-
-  const userLabel = targetUser 
-    ? `${targetUser.name} (${targetUser.mobile})` 
-    : (user || `User (${cleanMobile || '9999999999'})`);
 
   const numAmount = parseFloat(amount) || 500;
   const utrStr = utr || `UTR${Date.now()}`;
+  const userNameStr = targetUser ? targetUser.name : (user || `User (${cleanMobile || 'Mobile'})`);
+  const userMobileStr = targetUser ? targetUser.mobile : cleanMobile;
 
   const newDeposit = {
     _id: `dep_${Date.now()}`,
-    user: userLabel,
-    mobile: targetUser ? targetUser.mobile : cleanMobile,
+    user: `${userNameStr} (${userMobileStr || 'N/A'})`,
+    username: userNameStr,
+    mobile: userMobileStr,
     amount: numAmount,
     method: method || 'UPI / PhonePe',
     utr: utrStr,
+    utr_number: utrStr,
     status: 'Pending',
     createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   };
@@ -261,14 +259,16 @@ const submitDeposit = async (req, res) => {
     if (mongoose.connection.readyState === 1) {
       const DepositRequest = require('../models/DepositRequest');
       await DepositRequest.create({
-        user_id: targetUser ? targetUser.id : newDeposit._id,
+        user_id: userMobileStr || newDeposit._id,
         username: newDeposit.user,
         amount: numAmount,
         utr_number: utrStr,
         status: 'pending'
       });
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('[MongoDB Deposit Error]', e);
+  }
 
   const { saveDiskStore } = require('../store');
   saveDiskStore();
