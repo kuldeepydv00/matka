@@ -247,7 +247,7 @@ const requestWithdrawal = async (req, res) => {
     mobile: targetUser ? targetUser.mobile : (cleanMobile || '1234567890'),
     name: holder_name || (targetUser ? targetUser.name : 'User'),
     amount: numAmt,
-    status: 'pending',
+    status: 'Pending',
     payment_method: method || 'UPI',
     payment_details: details || 'UPI Payment',
     account_number: details || 'N/A',

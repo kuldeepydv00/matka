@@ -58,6 +58,26 @@
   },
   "memoryDeposits": [
     {
+      "_id": "dep_1787414649542",
+      "user": "kul (1122222222)",
+      "mobile": "1122222222",
+      "amount": 500,
+      "method": "UPI / PhonePe",
+      "utr": "UTR1787414649537",
+      "status": "Approved",
+      "createdAt": "09:34 PM"
+    },
+    {
+      "_id": "dep_1787414624709",
+      "user": "kul (1122222222)",
+      "mobile": "1122222222",
+      "amount": 500,
+      "method": "UPI / PhonePe",
+      "utr": "UTR1787414624704",
+      "status": "Approved",
+      "createdAt": "09:33 PM"
+    },
+    {
       "_id": "dep_1787414466075",
       "user": "kul (1122222222)",
       "mobile": "1122222222",
@@ -154,12 +174,40 @@
   ],
   "memoryWithdrawals": [
     {
+      "id": "wth_1787414661328",
+      "user": "1122222222",
+      "mobile": "1122222222",
+      "name": "egdf",
+      "amount": 500,
+      "status": "Pending",
+      "payment_method": "UPI",
+      "payment_details": "rewf@d",
+      "account_number": "rewf@d",
+      "ifsc_code": "N/A",
+      "upi_id": "rewf@d",
+      "created_at": "2026-08-22T16:04:21.328Z"
+    },
+    {
+      "id": "wth_1787414636044",
+      "user": "1122222222",
+      "mobile": "1122222222",
+      "name": "egdf",
+      "amount": 500,
+      "status": "Pending",
+      "payment_method": "UPI",
+      "payment_details": "rewf@d",
+      "account_number": "rewf@d",
+      "ifsc_code": "N/A",
+      "upi_id": "rewf@d",
+      "created_at": "2026-08-22T16:03:56.044Z"
+    },
+    {
       "id": "wth_1787414569405",
       "user": "1122222222",
       "mobile": "1122222222",
       "name": "kul",
       "amount": 500,
-      "status": "pending",
+      "status": "Pending",
       "payment_method": "UPI",
       "payment_details": "9999999999@ybl",
       "account_number": "9999999999@ybl",
@@ -173,7 +221,7 @@
       "mobile": "1122222222",
       "name": "egdf",
       "amount": 500,
-      "status": "pending",
+      "status": "Pending",
       "payment_method": "UPI",
       "payment_details": "rewf@d",
       "account_number": "rewf@d",
@@ -187,7 +235,7 @@
       "mobile": "1122222222",
       "name": "kul",
       "amount": 500,
-      "status": "pending",
+      "status": "Pending",
       "payment_method": "UPI",
       "payment_details": "9999999999@ybl",
       "account_number": "9999999999@ybl",
@@ -202,8 +250,10 @@
       "accountName": "kd",
       "accountNumber": "2131jnjnjnj332kjkjj34",
       "ifsc": "131233NJ43",
-      "status": "Rejected",
-      "createdAt": "01:29 AM"
+      "status": "Pending",
+      "createdAt": "01:29 AM",
+      "payment_details": "9999999999@ybl",
+      "upi_id": "9999999999@ybl"
     }
   ],
   "memoryBets": [
