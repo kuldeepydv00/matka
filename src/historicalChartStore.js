@@ -85,11 +85,13 @@ function formatDateKey(dateObj) {
   chartRecords["2026-04-18"] = { "Gali": "69", "Ghaziabad": "62", "Faridabad": "21", "Desawar": "15", "Disawer": "15", "Shri Ganesh": "67" };
   chartRecords["2026-04-19"] = { "Gali": "86", "Ghaziabad": "83", "Faridabad": "49", "Desawar": "93", "Disawer": "93", "Shri Ganesh": "60" };
 
-  // Seed all remaining dates back to Jan 1, 2024 deterministically
+  // Seed all past historical dates up to yesterday
   const startDate = new Date(2024, 0, 1);
-  const endDate = new Date();
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
 
-  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+  for (let d = new Date(startDate); d <= yesterday; d.setDate(d.getDate() + 1)) {
     const key = formatDateKey(d);
     if (!chartRecords[key]) {
       let seed = 0;
@@ -106,6 +108,26 @@ function formatDateKey(dateObj) {
       };
     }
   }
+
+  // Ensure Today has "--" for all games unless declared by Admin
+  const todayKey = formatDateKey(today);
+  const istNow = new Date(today.getTime() + (5.5 * 60 * 60 * 1000));
+  const istKey = formatDateKey(istNow);
+
+  [todayKey, istKey].forEach(k => {
+    chartRecords[k] = {
+      "Desawar": "--",
+      "Disawer": "--",
+      "Shiv Parwati": "--",
+      "Delhi Bazar": "--",
+      "Dubai Market": "--",
+      "Shree Ganesh": "--",
+      "Shri Ganesh": "--",
+      "Faridabad": "--",
+      "Ghaziabad": "--",
+      "Gali": "--"
+    };
+  });
 })();
 
 module.exports = {

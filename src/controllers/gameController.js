@@ -149,13 +149,17 @@ const getChartResults = async (req, res) => {
     console.error('[MongoDB Chart Fetch Error]', e);
   }
 
-  // If date is today, overlay memory declaredResultsMap
+  // If date is today, overlay memory declaredResultsMap (Strict Admin Control)
   if (reqDate === todayKey || reqDate === istKey) {
-    Object.keys(declaredResultsMap).forEach(game => {
+    const validGames = ['Desawar', 'Shiv Parwati', 'Delhi Bazar', 'Dubai Market', 'Shree Ganesh', 'Faridabad', 'Ghaziabad', 'Gali'];
+    validGames.forEach(game => {
       if (declaredResultsMap[game] !== null && declaredResultsMap[game] !== undefined) {
         const valStr = String(declaredResultsMap[game]).padStart(2, '0');
         baseResults[game] = valStr;
         if (game === 'Desawar') baseResults['Disawer'] = valStr;
+      } else {
+        baseResults[game] = '--';
+        if (game === 'Desawar') baseResults['Disawer'] = '--';
       }
     });
   }
