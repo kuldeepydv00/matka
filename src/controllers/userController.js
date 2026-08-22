@@ -1,4 +1,4 @@
-const { userWalletStore, registeredUsers } = require('../store');
+const { userWalletStore, registeredUsers, memoryDeposits, memoryWithdrawals, saveDiskStore } = require('../store');
 const { formatDateKey } = require('../historicalChartStore');
 
 // @desc    Register a new user
@@ -152,6 +152,58 @@ const updateWalletBalance = async (req, res) => {
 // @route   GET /api/user/wallet/transactions
 const getTransactions = async (req, res) => {
   res.json([]);
+};
+
+// @desc    Submit deposit request
+// @route   POST /api/user/deposit OR /api/user/deposit/request
+const submitDeposit = async (req, res) => {
+  const { user, mobile, amount, method, utr } = req.body;
+
+  const cleanMobile = (mobile || '').replace(/[^0-9]/g, '').slice(-10);
+  let targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+  if (!targetUser && registeredUsers.length > 0) {
+    targetUser = registeredUsers[0];
+  }
+
+  const userLabel = targetUser 
+    ? `${targetUser.name} (${targetUser.mobile})` 
+    : (user || `User (${cleanMobile || '9999999999'})`);
+
+  const numAmount = parseFloat(amount) || 500;
+  const utrStr = utr || `UTR${Date.now()}`;
+
+  const newDeposit = {
+    _id: `dep_${Date.now()}`,
+    user: userLabel,
+    mobile: targetUser ? targetUser.mobile : cleanMobile,
+    amount: numAmount,
+    method: method || 'UPI / PhonePe',
+    utr: utrStr,
+    status: 'Pending',
+    createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  };
+
+  memoryDeposits.unshift(newDeposit);
+
+  // Sync to MongoDB Atlas DepositRequest collection
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const DepositRequest = require('../models/DepositRequest');
+      await DepositRequest.create({
+        user_id: targetUser ? targetUser.id : newDeposit._id,
+        username: newDeposit.user,
+        amount: numAmount,
+        utr_number: utrStr,
+        status: 'pending'
+      });
+    }
+  } catch (e) {}
+
+  const { saveDiskStore } = require('../store');
+  saveDiskStore();
+  console.log(`[Deposit Submitted] ${newDeposit.user} requested ₹${newDeposit.amount} (UTR: ${newDeposit.utr})`);
+  res.status(201).json({ success: true, message: 'Deposit request submitted successfully! Admin will verify and approve shortly.', deposit: newDeposit });
 };
 
 // @desc    Submit withdrawal request
@@ -330,6 +382,7 @@ module.exports = {
   getWalletBalance,
   updateWalletBalance,
   getTransactions,
+  submitDeposit,
   requestWithdrawal,
   sendSmsOtp,
   verifySmsOtp,

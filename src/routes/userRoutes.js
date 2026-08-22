@@ -7,6 +7,7 @@ const {
   getWalletBalance, 
   updateWalletBalance, 
   getTransactions, 
+  submitDeposit,
   requestWithdrawal,
   sendSmsOtp,
   verifySmsOtp,
@@ -22,6 +23,8 @@ router.get('/profile', getUserProfile);
 router.get('/wallet/balance', getWalletBalance);
 router.post('/wallet/balance', updateWalletBalance);
 router.get('/wallet/transactions', getTransactions);
+router.post('/deposit', submitDeposit);
+router.post('/deposit/request', submitDeposit);
 router.post('/withdraw/request', requestWithdrawal);
 
 module.exports = router;

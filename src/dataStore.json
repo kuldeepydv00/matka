@@ -45,18 +45,38 @@
       "name": "kul",
       "mobile": "1122222222",
       "password": "123456",
-      "balance": 811,
+      "balance": 311,
       "status": "Active",
       "createdAt": "10:30 PM",
       "createdDateKey": "2026-08-19"
     }
   ],
   "userWalletStore": {
-    "balance": 0,
+    "balance": 311,
     "name": "kul",
     "mobile": "1122222222"
   },
   "memoryDeposits": [
+    {
+      "_id": "dep_1787413133691",
+      "user": "kul (1122222222)",
+      "mobile": "1122222222",
+      "amount": 500,
+      "method": "UPI / PhonePe",
+      "utr": "1222223232223",
+      "status": "Pending",
+      "createdAt": "09:08 PM"
+    },
+    {
+      "_id": "dep_1787413031494",
+      "user": "kul (1122222222)",
+      "mobile": "1122222222",
+      "amount": 500,
+      "method": "UPI / PhonePe",
+      "utr": "1222223232223",
+      "status": "Pending",
+      "createdAt": "09:07 PM"
+    },
     {
       "_id": "dep_1786826597735",
       "user": "yogibbk (7027709695)",
@@ -113,6 +133,20 @@
     }
   ],
   "memoryWithdrawals": [
+    {
+      "id": "wth_1787413133715",
+      "user": "1122222222",
+      "mobile": "1122222222",
+      "name": "kul",
+      "amount": 500,
+      "status": "pending",
+      "payment_method": "UPI",
+      "payment_details": "9999999999@ybl",
+      "account_number": "9999999999@ybl",
+      "ifsc_code": "N/A",
+      "upi_id": "9999999999@ybl",
+      "created_at": "2026-08-22T15:38:53.715Z"
+    },
     {
       "_id": "wth_1786823961195",
       "user": "1234567888 (1234567888)",
@@ -8052,6 +8086,22 @@
       "Faridabad": "59",
       "Shree Ganesh": "02",
       "Delhi Bazar": "05"
+    },
+    "2026-08-21": {
+      "Gali": "28",
+      "Ghaziabad": "32",
+      "Faridabad": "64",
+      "Desawar": "78",
+      "Disawer": "78",
+      "Shri Ganesh": "64"
+    },
+    "2026-08-22": {
+      "Gali": "45",
+      "Ghaziabad": "55",
+      "Faridabad": "95",
+      "Desawar": "19",
+      "Disawer": "19",
+      "Shri Ganesh": "17"
     }
   },
   "bannerConfig": {
