@@ -331,7 +331,7 @@ const getDeposits = async (req, res) => {
       const dbDeps = await DepositRequest.find().sort({ createdAt: -1 }).lean();
       if (dbDeps && dbDeps.length > 0) {
         dbDeps.forEach(d => {
-          if (!memoryDeposits.some(m => (m._id && String(m._id) === String(d._id)) || m.utr === d.utr_number)) {
+          if (!memoryDeposits.some(m => m._id && String(m._id) === String(d._id))) {
             memoryDeposits.unshift({
               _id: d._id,
               user: d.username || 'User',
