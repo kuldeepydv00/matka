@@ -49,12 +49,22 @@
       "status": "Active",
       "createdAt": "10:30 PM",
       "createdDateKey": "2026-08-19"
+    },
+    {
+      "id": "usr_1787418050480",
+      "name": "qw",
+      "mobile": "1231231231",
+      "password": "123456",
+      "balance": 0,
+      "status": "Active",
+      "createdAt": "10:30 PM",
+      "createdDateKey": "2026-08-22"
     }
   ],
   "userWalletStore": {
-    "balance": 1311,
-    "name": "kul",
-    "mobile": "1122222222"
+    "balance": 0,
+    "name": "qw",
+    "mobile": "1231231231"
   },
   "memoryDeposits": [
     {

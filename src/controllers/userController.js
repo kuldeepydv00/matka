@@ -102,7 +102,31 @@ const getUserProfile = async (req, res) => {
   if (mobile && mobile.trim().length > 0) {
     const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
     targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+
+    try {
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState === 1) {
+        const User = require('../models/User');
+        const dbUser = await User.findOne({ mobile: cleanMobile });
+        if (dbUser) {
+          if (!targetUser) {
+            targetUser = {
+              id: dbUser._id,
+              name: dbUser.name || dbUser.username || `User ${cleanMobile.slice(-4)}`,
+              mobile: cleanMobile,
+              balance: dbUser.wallet_balance || 0.00,
+              status: 'Active'
+            };
+            registeredUsers.push(targetUser);
+          } else {
+            if (dbUser.name && dbUser.name !== 'User') targetUser.name = dbUser.name;
+            if (dbUser.wallet_balance !== undefined) targetUser.balance = dbUser.wallet_balance;
+          }
+        }
+      }
+    } catch (e) { }
   }
+
   if (targetUser) return res.json(targetUser);
   res.json({ name: 'User', mobile: mobile || '', balance: 0.00 });
 };
