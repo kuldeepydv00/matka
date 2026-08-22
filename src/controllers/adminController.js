@@ -255,6 +255,20 @@ const clearGameResult = async (req, res) => {
   delete declaredResultsMap[game_name];
   if (game_name === 'Desawar') delete declaredResultsMap['Disawer'];
   if (game_name === 'Disawer') delete declaredResultsMap['Desawar'];
+  if (game_name === 'Shree Ganesh') delete declaredResultsMap['Shri Ganesh'];
+  if (game_name === 'Shri Ganesh') delete declaredResultsMap['Shree Ganesh'];
+
+  // Delete record from MongoDB Atlas
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const ResultRecord = require('../models/ResultRecord');
+      const todayKey = formatDateKey(new Date());
+      const istNow = new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000));
+      const istKey = formatDateKey(istNow);
+      ResultRecord.deleteMany({ game_name, date_key: { $in: [todayKey, istKey] } }).catch(e => console.error('[MongoDB Delete Error]', e));
+    }
+  } catch (e) {}
 
   saveDiskStore();
 

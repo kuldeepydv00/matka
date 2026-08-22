@@ -116,26 +116,7 @@ const getMyBets = async (req, res) => {
 // @route   GET /api/game/results
 // @access  Public
 const getResults = async (req, res) => {
-  const resultsObj = { ...declaredResultsMap };
-
-  // Query MongoDB Atlas ResultRecord for today's declared results
-  try {
-    const mongoose = require('mongoose');
-    if (mongoose.connection.readyState === 1) {
-      const ResultRecord = require('../models/ResultRecord');
-      const todayKey = formatDateKey(new Date());
-      const dbRecords = await ResultRecord.find({ date_key: todayKey });
-      dbRecords.forEach(r => {
-        if (r.game_name && r.winning_number !== undefined && r.winning_number !== null) {
-          resultsObj[r.game_name] = r.winning_number;
-          if (r.game_name === 'Desawar') resultsObj['Disawer'] = r.winning_number;
-          if (r.game_name === 'Shree Ganesh') resultsObj['Shri Ganesh'] = r.winning_number;
-        }
-      });
-    }
-  } catch (e) {}
-
-  res.json(resultsObj);
+  res.json(declaredResultsMap);
 };
 
 // @desc    Get date-wise chart results for all games (Historical & Live from DB)
