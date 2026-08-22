@@ -103,7 +103,34 @@ const getMyBets = async (req, res) => {
   const userMobile = req.query.mobile || req.query.user;
   if (userMobile && userMobile.trim().length >= 10) {
     const cleanMobile = userMobile.replace(/[^0-9]/g, '').slice(-10);
-    const userBets = memoryBets.filter(b => b.user && b.user.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+    let userBets = memoryBets.filter(b => b.user && b.user.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+
+    // Query MongoDB Atlas for cloud-stored bets
+    try {
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState === 1) {
+        const Bet = require('../models/Bet');
+        const dbBets = await Bet.find({ $or: [{ mobile: cleanMobile }, { user: { $regex: cleanMobile } }] });
+        dbBets.forEach(dbb => {
+          const exists = userBets.some(b => b._id === String(dbb._id) || b.id === String(dbb._id));
+          if (!exists) {
+            userBets.unshift({
+              _id: String(dbb._id),
+              game_name: dbb.game_name,
+              bet_type: dbb.bet_type || 'JODI',
+              number: dbb.number,
+              bet_amount: dbb.bet_amount,
+              potential_payout: dbb.potential_payout || (dbb.bet_amount * 95),
+              win_amount: dbb.win_amount || 0,
+              status: dbb.status || 'pending',
+              user: dbb.user || cleanMobile,
+              created_at: dbb.created_at || dbb.createdAt || new Date().toISOString()
+            });
+          }
+        });
+      }
+    } catch (e) { }
+
     return res.json(userBets);
   }
   res.json(memoryBets);

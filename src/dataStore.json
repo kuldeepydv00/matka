@@ -59,14 +59,34 @@
       "status": "Active",
       "createdAt": "10:30 PM",
       "createdDateKey": "2026-08-22"
+    },
+    {
+      "id": "usr_1787421464569",
+      "name": "ed",
+      "mobile": "1122112211",
+      "password": "123456",
+      "balance": 445,
+      "status": "Active",
+      "createdAt": "11:27 PM",
+      "createdDateKey": "2026-08-22"
     }
   ],
   "userWalletStore": {
-    "balance": 0,
-    "name": "qw",
-    "mobile": "1231231231"
+    "balance": 500,
+    "name": "ed",
+    "mobile": "1122112211"
   },
   "memoryDeposits": [
+    {
+      "_id": "dep_1787421468102",
+      "user": "ed (1122112211)",
+      "mobile": "1122112211",
+      "amount": 500,
+      "method": "UPI / PhonePe",
+      "utr": "UTR1787421468095",
+      "status": "Approved",
+      "createdAt": "11:27 PM"
+    },
     {
       "_id": "dep_1787414649542",
       "user": "kul (1122222222)",
@@ -281,6 +301,54 @@
     }
   ],
   "memoryBets": [
+    {
+      "_id": "bet_1787421490950_959",
+      "game_name": "Desawar",
+      "bet_type": "JODI",
+      "number": 7,
+      "bet_amount": 12,
+      "potential_payout": 1140,
+      "win_amount": 0,
+      "status": "pending",
+      "user": "ed (1122112211)",
+      "created_at": "2026-08-22T17:58:10.950Z"
+    },
+    {
+      "_id": "bet_1787421490950_53",
+      "game_name": "Desawar",
+      "bet_type": "JODI",
+      "number": 2,
+      "bet_amount": 19,
+      "potential_payout": 1805,
+      "win_amount": 0,
+      "status": "pending",
+      "user": "ed (1122112211)",
+      "created_at": "2026-08-22T17:58:10.950Z"
+    },
+    {
+      "_id": "bet_1787421490950_735",
+      "game_name": "Desawar",
+      "bet_type": "JODI",
+      "number": 18,
+      "bet_amount": 12,
+      "potential_payout": 1140,
+      "win_amount": 0,
+      "status": "pending",
+      "user": "ed (1122112211)",
+      "created_at": "2026-08-22T17:58:10.950Z"
+    },
+    {
+      "_id": "bet_1787421490950_356",
+      "game_name": "Desawar",
+      "bet_type": "JODI",
+      "number": 13,
+      "bet_amount": 12,
+      "potential_payout": 1140,
+      "win_amount": 0,
+      "status": "pending",
+      "user": "ed (1122112211)",
+      "created_at": "2026-08-22T17:58:10.950Z"
+    },
     {
       "_id": "bet_1787416501130_201",
       "game_name": "Desawar",

@@ -132,6 +132,7 @@ const getUserProfile = async (req, res) => {
 };
 
 // @desc    Get live wallet balance
+// @desc    Get live wallet balance
 // @route   GET /api/user/wallet/balance
 const getWalletBalance = async (req, res) => {
   const { mobile } = req.query;
@@ -139,6 +140,29 @@ const getWalletBalance = async (req, res) => {
   if (mobile && mobile.trim().length > 0) {
     const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
     targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+
+    try {
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState === 1) {
+        const User = require('../models/User');
+        const dbUser = await User.findOne({ mobile: cleanMobile });
+        if (dbUser) {
+          if (!targetUser) {
+            targetUser = {
+              id: dbUser._id,
+              name: dbUser.name || dbUser.username || `User ${cleanMobile.slice(-4)}`,
+              mobile: cleanMobile,
+              balance: dbUser.wallet_balance || 0.00,
+              status: 'Active'
+            };
+            registeredUsers.push(targetUser);
+          } else {
+            if (dbUser.name && dbUser.name !== 'User') targetUser.name = dbUser.name;
+            if (dbUser.wallet_balance !== undefined) targetUser.balance = dbUser.wallet_balance;
+          }
+        }
+      }
+    } catch (e) { }
   }
 
   const currentBal = targetUser ? (targetUser.balance || 0.00) : 0.00;
@@ -153,8 +177,9 @@ const updateWalletBalance = async (req, res) => {
   const val = parseFloat(amount);
   if (!isNaN(val)) {
     let targetUser = null;
+    let cleanMobile = '';
     if (mobile) {
-      const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
+      cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
       targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
     }
     if (!targetUser && registeredUsers.length > 0) {
@@ -163,11 +188,31 @@ const updateWalletBalance = async (req, res) => {
 
     if (targetUser) {
       targetUser.balance = val;
+      cleanMobile = targetUser.mobile.replace(/[^0-9]/g, '').slice(-10);
     }
     userWalletStore.balance = val;
 
     const { saveDiskStore } = require('../store');
     saveDiskStore();
+
+    // Sync wallet balance to MongoDB Atlas
+    try {
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState === 1 && cleanMobile) {
+        const User = require('../models/User');
+        User.findOneAndUpdate(
+          { mobile: cleanMobile },
+          { wallet_balance: val, name: targetUser ? targetUser.name : 'User' },
+          { upsert: true, new: true }
+        ).then(() => console.log(`[MongoDB] Updated wallet balance for ${cleanMobile}: ₹${val}`))
+         .catch(e => console.error('[MongoDB Wallet Sync Error]', e));
+      }
+    } catch (e) { }
+
+    return res.json({ success: true, balance: val });
+  }
+  res.status(400).json({ message: 'Invalid balance amount' });
+};
   }
   res.json({ balance: userWalletStore.balance });
 };

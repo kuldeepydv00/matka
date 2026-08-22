@@ -42,6 +42,34 @@ const getStats = async (req, res) => {
 // @desc    Get all registered users for Admin Panel
 // @route   GET /api/admin/users
 const getUsers = async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const User = require('../models/User');
+      const dbUsers = await User.find({});
+      dbUsers.forEach(dbu => {
+        const cleanMobile = (dbu.mobile || '').replace(/[^0-9]/g, '').slice(-10);
+        if (cleanMobile) {
+          let memUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+          if (!memUser) {
+            memUser = {
+              id: dbu._id,
+              name: dbu.name || dbu.username || `User ${cleanMobile.slice(-4)}`,
+              mobile: cleanMobile,
+              balance: dbu.wallet_balance || 0.00,
+              status: 'Active',
+              createdAt: dbu.createdAt ? new Date(dbu.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today'
+            };
+            registeredUsers.push(memUser);
+          } else {
+            if (dbu.name && dbu.name !== 'User') memUser.name = dbu.name;
+            if (dbu.wallet_balance !== undefined) memUser.balance = dbu.wallet_balance;
+          }
+        }
+      });
+    }
+  } catch (e) { }
+
   res.json(registeredUsers);
 };
 
