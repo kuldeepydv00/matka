@@ -75,18 +75,28 @@
       "name": "Qp",
       "mobile": "1472580369",
       "password": "123",
-      "balance": 0,
+      "balance": 500,
       "status": "Active",
       "createdAt": "01:09 AM",
       "createdDateKey": "2026-08-23"
     }
   ],
   "userWalletStore": {
-    "balance": 0,
+    "balance": 500,
     "name": "Qp",
     "mobile": "1472580369"
   },
   "memoryDeposits": [
+    {
+      "_id": "dep_1787427843272",
+      "user": "Qp (1472580369)",
+      "mobile": "1472580369",
+      "amount": 500,
+      "method": "UPI / PhonePe",
+      "utr": "123456789012",
+      "status": "Approved",
+      "createdAt": "01:14 AM"
+    },
     {
       "_id": "dep_1787421468102",
       "user": "ed (1122112211)",

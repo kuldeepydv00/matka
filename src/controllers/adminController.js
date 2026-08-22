@@ -451,10 +451,30 @@ const createDepositRequest = async (req, res) => {
   res.status(201).json(newDeposit);
 };
 
-// @desc    Approve deposit request & update user balance
+// @desc    Approve deposit request & update user balance in memory + MongoDB Atlas
 const approveDeposit = async (req, res) => {
   const { id } = req.params;
-  let dep = memoryDeposits.find(d => d._id === id || d.id === id || d.utr === id);
+  let dep = memoryDeposits.find(d => String(d._id) === String(id) || String(d.id) === String(id) || String(d.utr) === String(id));
+
+  const mongoose = require('mongoose');
+
+  if (!dep && mongoose.connection.readyState === 1) {
+    try {
+      const DepositRequest = require('../models/DepositRequest');
+      const dbDep = await DepositRequest.findById(id);
+      if (dbDep) {
+        dep = {
+          _id: dbDep._id,
+          user: dbDep.username || 'User',
+          mobile: dbDep.user_id || 'N/A',
+          amount: dbDep.amount,
+          utr: dbDep.utr_number,
+          status: dbDep.status
+        };
+        memoryDeposits.unshift(dep);
+      }
+    } catch (e) {}
+  }
 
   if (!dep) {
     return res.status(404).json({ success: false, message: 'Deposit request not found' });
@@ -463,28 +483,80 @@ const approveDeposit = async (req, res) => {
   dep.status = 'Approved';
   userWalletStore.balance += dep.amount;
   
-  // Find target user by mobile in registeredUsers
-  let userObj = registeredUsers.find(u => dep.user && dep.user.includes(u.mobile));
+  // Extract clean 10-digit mobile from dep.mobile or dep.user
+  const rawMobile = (dep.mobile || dep.user || '').replace(/[^0-9]/g, '');
+  const cleanMobile = rawMobile.length >= 10 ? rawMobile.slice(-10) : '';
+
+  let userObj = registeredUsers.find(u => 
+    (cleanMobile && u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile) ||
+    (dep.user && dep.user.includes(u.mobile))
+  );
+
   if (!userObj && registeredUsers.length > 0) {
     userObj = registeredUsers[0];
   }
+
+  let updatedNewBalance = 0;
   if (userObj) {
     userObj.balance = (userObj.balance || 0) + dep.amount;
+    updatedNewBalance = userObj.balance;
+  }
+
+  // Update MongoDB Atlas DepositRequest and User wallet_balance live!
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const DepositRequest = require('../models/DepositRequest');
+      const User = require('../models/User');
+
+      await DepositRequest.updateOne(
+        { _id: dep._id },
+        { $set: { status: 'approved' } }
+      );
+
+      if (cleanMobile) {
+        const updatedUser = await User.findOneAndUpdate(
+          { mobile: cleanMobile },
+          { $inc: { wallet_balance: dep.amount } },
+          { new: true }
+        );
+        if (updatedUser) {
+          updatedNewBalance = updatedUser.wallet_balance;
+          if (userObj) userObj.balance = updatedUser.wallet_balance;
+        }
+      }
+      console.log(`[MongoDB Deposit Sync] Credited ₹${dep.amount} to user (+91 ${cleanMobile}). New balance: ₹${updatedNewBalance}`);
+    }
+  } catch (e) {
+    console.error('[MongoDB Approve Deposit Error]', e);
   }
 
   saveDiskStore();
-  console.log(`[Admin Deposit] Approved ₹${dep.amount} deposit for ${dep.user}`);
-  res.json({ success: true, message: `Deposit of ₹${dep.amount} verified & credited to ${userObj ? userObj.name : dep.user}!`, deposit: dep });
+  res.json({
+    success: true,
+    message: `Deposit of ₹${dep.amount} verified & credited to user! New balance: ₹${updatedNewBalance}`,
+    newBalance: updatedNewBalance,
+    deposit: dep
+  });
 };
 
 // @desc    Reject deposit request
 const rejectDeposit = async (req, res) => {
   const { id } = req.params;
-  let dep = memoryDeposits.find(d => d._id === id || d.id === id || d.utr === id);
+  let dep = memoryDeposits.find(d => String(d._id) === String(id) || String(d.id) === String(id) || String(d.utr) === String(id));
+
   if (dep) {
     dep.status = 'Rejected';
-    saveDiskStore();
   }
+
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const DepositRequest = require('../models/DepositRequest');
+      await DepositRequest.updateOne({ _id: id }, { $set: { status: 'rejected' } });
+    }
+  } catch (e) {}
+
+  saveDiskStore();
   res.json({ success: true, message: 'Deposit request rejected', deposit: dep });
 };
 
