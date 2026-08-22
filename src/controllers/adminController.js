@@ -324,7 +324,62 @@ const getDeclaredResults = async (req, res) => {
 // @desc    Get deposit requests
 // @route   GET /api/admin/deposits
 const getDeposits = async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const DepositRequest = require('../models/DepositRequest');
+      const dbDeps = await DepositRequest.find().sort({ createdAt: -1 }).lean();
+      if (dbDeps && dbDeps.length > 0) {
+        dbDeps.forEach(d => {
+          if (!memoryDeposits.some(m => (m._id && String(m._id) === String(d._id)) || m.utr === d.utr_number)) {
+            memoryDeposits.unshift({
+              _id: d._id,
+              user: d.username || 'User',
+              amount: d.amount,
+              method: 'UPI / PhonePe',
+              utr: d.utr_number,
+              status: d.status ? (d.status.charAt(0).toUpperCase() + d.status.slice(1)) : 'Pending',
+              createdAt: d.createdAt ? new Date(d.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today'
+            });
+          }
+        });
+      }
+    }
+  } catch (e) {}
   res.json(memoryDeposits);
+};
+
+// @desc    Get withdrawal requests
+const getWithdrawals = async (req, res) => {
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const WithdrawalRequest = require('../models/WithdrawalRequest');
+      const dbWths = await WithdrawalRequest.find().sort({ createdAt: -1 }).lean();
+      if (dbWths && dbWths.length > 0) {
+        dbWths.forEach(w => {
+          if (!memoryWithdrawals.some(m => (m.id && String(m.id) === String(w._id)) || (m._id && String(m._id) === String(w._id)))) {
+            memoryWithdrawals.unshift({
+              id: w._id,
+              _id: w._id,
+              user: w.username || 'User',
+              mobile: w.user_id || 'N/A',
+              name: w.username || 'User',
+              amount: w.amount,
+              status: w.status ? w.status.toLowerCase() : 'pending',
+              payment_method: w.payment_method || 'UPI',
+              payment_details: w.account_details || 'UPI Payment',
+              account_number: w.account_details || 'N/A',
+              ifsc_code: 'N/A',
+              upi_id: w.payment_method === 'UPI' ? w.account_details : 'N/A',
+              created_at: w.createdAt ? new Date(w.createdAt).toISOString() : new Date().toISOString()
+            });
+          }
+        });
+      }
+    }
+  } catch (e) {}
+  res.json(memoryWithdrawals);
 };
 
 // @desc    Create deposit request (from user app or manual)
@@ -386,11 +441,6 @@ const rejectDeposit = async (req, res) => {
     saveDiskStore();
   }
   res.json({ success: true, message: 'Deposit request rejected', deposit: dep });
-};
-
-// @desc    Get withdrawal requests
-const getWithdrawals = async (req, res) => {
-  res.json(memoryWithdrawals);
 };
 
 // @desc    Create withdrawal request
