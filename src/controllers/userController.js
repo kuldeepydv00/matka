@@ -11,56 +11,57 @@ const registerUser = async (req, res) => {
 
   const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
   let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+  const finalName = (name && name.trim().length > 0 && name !== 'User') ? name.trim() : (user ? user.name : `User ${cleanMobile.slice(-4)}`);
 
   if (user) {
-    if (name && name.trim().length > 0 && name !== 'User') {
-      user.name = name.trim();
-    }
-    console.log(`[Registration] Existing user logged in: ${user.name} (${user.mobile})`);
-    return res.json({ success: true, message: 'User logged in successfully', user });
+    user.name = finalName;
+  } else {
+    user = {
+      id: `usr_${Date.now()}`,
+      name: finalName,
+      mobile: cleanMobile,
+      password: password || '123',
+      balance: 0.00,
+      status: 'Active',
+      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdDateKey: formatDateKey(new Date())
+    };
+    registeredUsers.push(user);
   }
 
-  const newUser = {
-    id: `usr_${Date.now()}`,
-    name: (name && name.trim().length > 0) ? name.trim() : `User ${cleanMobile.slice(-4)}`,
-    mobile: cleanMobile,
-    password: password || '123',
-    balance: 0.00,
-    status: 'Active',
-    createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    createdDateKey: formatDateKey(new Date())
-  };
-
-  registeredUsers.push(newUser);
-  userWalletStore.name = newUser.name;
-  userWalletStore.mobile = newUser.mobile;
-  userWalletStore.balance = newUser.balance;
+  userWalletStore.name = user.name;
+  userWalletStore.mobile = user.mobile;
+  userWalletStore.balance = user.balance;
 
   const { saveDiskStore } = require('../store');
   saveDiskStore();
 
-  // Save new registered user into MongoDB Atlas Database
+  // Save/Update registered user into MongoDB Atlas Database
   try {
     const mongoose = require('mongoose');
     if (mongoose.connection.readyState === 1) {
       const User = require('../models/User');
-      User.findOneAndUpdate(
+      await User.findOneAndUpdate(
         { mobile: cleanMobile },
         {
-          name: newUser.name,
-          username: newUser.name,
-          mobile: cleanMobile,
-          password: newUser.password,
-          wallet_balance: 0.00
+          $setOnInsert: { wallet_balance: user.balance || 0.00 },
+          $set: {
+            name: user.name,
+            username: user.name,
+            mobile: cleanMobile,
+            password: user.password || '123'
+          }
         },
         { upsert: true, new: true }
-      ).then(() => console.log(`[MongoDB] New user saved to Cloud Database: ${newUser.name} (+91 ${cleanMobile})`))
-       .catch(e => console.error('[MongoDB User Creation Error]', e));
+      );
+      console.log(`[MongoDB] Registered/Synced user in Cloud Database: ${user.name} (+91 ${cleanMobile})`);
     }
-  } catch (e) { }
+  } catch (e) {
+    console.error('[MongoDB User Creation Error]', e);
+  }
 
-  console.log(`[Registration] New user created & added to Admin Directory: ${newUser.name} (+91 ${newUser.mobile})`);
-  res.status(201).json({ success: true, message: 'Account registered successfully', user: newUser });
+  console.log(`[Registration] User registered/synced to Admin Directory: ${user.name} (+91 ${user.mobile})`);
+  res.status(200).json({ success: true, message: 'Account registered successfully', user });
 };
 
 // @desc    Login existing user
