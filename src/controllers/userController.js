@@ -259,9 +259,6 @@ const updateWalletBalance = async (req, res) => {
   }
   res.status(400).json({ message: 'Invalid balance amount' });
 };
-  }
-  res.json({ balance: userWalletStore.balance });
-};
 
 // @desc    Get transaction history
 // @route   GET /api/user/wallet/transactions
