@@ -4,7 +4,7 @@ const { formatDateKey } = require('../historicalChartStore');
 // @desc    Register a new user
 // @route   POST /api/user/register
 const registerUser = async (req, res) => {
-  const { name, mobile, password } = req.body;
+  const { name, mobile, password, referral_code } = req.body;
   if (!mobile) {
     return res.status(400).json({ message: 'Mobile number is required' });
   }
@@ -13,8 +13,11 @@ const registerUser = async (req, res) => {
   let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
   const finalName = (name && name.trim().length > 0 && name !== 'User') ? name.trim() : (user ? user.name : `User ${cleanMobile.slice(-4)}`);
 
+  const ownReferralCode = `REF${cleanMobile}`;
+
   if (user) {
     user.name = finalName;
+    if (!user.referral_code) user.referral_code = ownReferralCode;
   } else {
     user = {
       id: `usr_${Date.now()}`,
@@ -23,9 +26,42 @@ const registerUser = async (req, res) => {
       password: password || '123',
       balance: 0.00,
       status: 'Active',
+      referral_code: ownReferralCode,
+      referred_by: null,
+      referralsCount: 0,
       createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       createdDateKey: formatDateKey(new Date())
     };
+
+    // Check if referral_code was provided
+    if (referral_code && referral_code.trim()) {
+      const cleanRef = referral_code.trim().toUpperCase().replace('REF', '');
+      const cleanRefMobile = cleanRef.slice(-10);
+      let referrer = registeredUsers.find(u => 
+        u.mobile.slice(-10) === cleanRefMobile || 
+        (u.referral_code && u.referral_code.toUpperCase() === referral_code.trim().toUpperCase())
+      );
+
+      if (referrer && referrer.mobile !== cleanMobile) {
+        user.referred_by = referrer.mobile;
+        referrer.referralsCount = (referrer.referralsCount || 0) + 1;
+        referrer.balance = (referrer.balance || 0) + 50.00; // ₹50 Referral Bonus!
+        console.log(`[Referral Reward] ${referrer.name} (+91 ${referrer.mobile}) earned ₹50 referral bonus for inviting ${user.name}!`);
+
+        // Credit referrer in MongoDB Atlas
+        try {
+          const mongoose = require('mongoose');
+          if (mongoose.connection.readyState === 1) {
+            const User = require('../models/User');
+            User.updateOne(
+              { mobile: referrer.mobile },
+              { $inc: { wallet_balance: 50, referrals_count: 1 } }
+            ).catch(e => console.error('[MongoDB Referral Error]', e));
+          }
+        } catch (e) {}
+      }
+    }
+
     registeredUsers.push(user);
   }
 
@@ -44,12 +80,14 @@ const registerUser = async (req, res) => {
       await User.findOneAndUpdate(
         { mobile: cleanMobile },
         {
-          $setOnInsert: { wallet_balance: user.balance || 0.00 },
+          $setOnInsert: { wallet_balance: user.balance || 0.00, referral_code: ownReferralCode },
           $set: {
             name: user.name,
             username: user.name,
             mobile: cleanMobile,
-            password: user.password || '123'
+            password: user.password || '123',
+            referral_code: ownReferralCode,
+            referred_by: user.referred_by || null
           }
         },
         { upsert: true, new: true }
@@ -60,7 +98,7 @@ const registerUser = async (req, res) => {
     console.error('[MongoDB User Creation Error]', e);
   }
 
-  console.log(`[Registration] User registered/synced to Admin Directory: ${user.name} (+91 ${user.mobile})`);
+  console.log(`[Registration] User registered/synced: ${user.name} (+91 ${user.mobile}), Referral: ${user.referral_code}`);
   res.status(200).json({ success: true, message: 'Account registered successfully', user });
 };
 
@@ -116,20 +154,27 @@ const getUserProfile = async (req, res) => {
               name: dbUser.name || dbUser.username || `User ${cleanMobile.slice(-4)}`,
               mobile: cleanMobile,
               balance: dbUser.wallet_balance || 0.00,
+              referral_code: dbUser.referral_code || `REF${cleanMobile}`,
               status: 'Active'
             };
             registeredUsers.push(targetUser);
           } else {
             if (dbUser.name && dbUser.name !== 'User') targetUser.name = dbUser.name;
             if (dbUser.wallet_balance !== undefined) targetUser.balance = dbUser.wallet_balance;
+            if (!targetUser.referral_code) targetUser.referral_code = dbUser.referral_code || `REF${cleanMobile}`;
           }
         }
       }
     } catch (e) { }
   }
 
-  if (targetUser) return res.json(targetUser);
-  res.json({ name: 'User', mobile: mobile || '', balance: 0.00 });
+  if (targetUser) {
+    if (!targetUser.referral_code && targetUser.mobile) {
+      targetUser.referral_code = `REF${targetUser.mobile.slice(-10)}`;
+    }
+    return res.json(targetUser);
+  }
+  res.json({ name: 'User', mobile: mobile || '', balance: 0.00, referral_code: 'REF1234567890' });
 };
 
 // @desc    Get live wallet balance
