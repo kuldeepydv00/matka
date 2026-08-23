@@ -75,14 +75,14 @@
       "name": "Qp",
       "mobile": "1472580369",
       "password": "123",
-      "balance": 500,
+      "balance": 1000,
       "status": "Active",
       "createdAt": "01:09 AM",
       "createdDateKey": "2026-08-23"
     }
   ],
   "userWalletStore": {
-    "balance": 500,
+    "balance": 1000,
     "name": "Qp",
     "mobile": "1472580369"
   },

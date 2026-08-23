@@ -670,6 +670,16 @@ const updateUserWallet = async (req, res) => {
 // @route   GET /api/game/banner
 const getBannerConfig = async (req, res) => {
   const { bannerConfig } = require('../store');
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const BannerModel = mongoose.model('Banner', new mongoose.Schema({}, { strict: false }));
+      const dbBanner = await BannerModel.findOne({}).lean();
+      if (dbBanner) {
+        Object.assign(bannerConfig, dbBanner);
+      }
+    }
+  } catch (e) {}
   res.json(bannerConfig);
 };
 
@@ -687,6 +697,21 @@ const updateBannerConfig = async (req, res) => {
   if (minDeposit !== undefined) bannerConfig.minDeposit = minDeposit;
   if (minWithdrawal !== undefined) bannerConfig.minWithdrawal = minWithdrawal;
   if (imageUrl !== undefined) bannerConfig.imageUrl = imageUrl;
+
+  saveDiskStore();
+
+  // Also sync bannerConfig to MongoDB Atlas if connected
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const BannerModel = mongoose.model('Banner', new mongoose.Schema({}, { strict: false }));
+      await BannerModel.findOneAndUpdate({}, bannerConfig, { upsert: true, new: true });
+    }
+  } catch (e) {}
+
+  console.log(`[Admin Banner] Updated banner config: ${JSON.stringify(bannerConfig).substring(0, 100)}...`);
+  res.json({ success: true, message: 'Banner configuration updated successfully', bannerConfig });
+};
 
 // @desc    Get all placed bets for Admin Panel
 // @route   GET /api/admin/bets
