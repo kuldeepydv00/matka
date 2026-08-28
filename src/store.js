@@ -145,6 +145,12 @@ function loadDiskStore() {
   }
 }
 
+let referralConfig = {
+  enabled: true,
+  signupBonus: 50,
+  commissionPercentage: 4
+};
+
 // Initial load on server startup
 loadDiskStore();
 
@@ -157,5 +163,6 @@ module.exports = {
   declaredResultsMap,
   gameSchedulesStore,
   bannerConfig,
+  referralConfig,
   saveDiskStore
 };

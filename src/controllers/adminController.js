@@ -748,6 +748,49 @@ const getAdminBets = async (req, res) => {
   res.json(memoryBets);
 };
 
+// @desc    Get referral configuration
+// @route   GET /api/admin/referral-config
+const getReferralConfig = async (req, res) => {
+  const { referralConfig } = require('../store');
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const ConfigModel = mongoose.model('SystemConfig', new mongoose.Schema({}, { strict: false }));
+      const dbConfig = await ConfigModel.findOne({ type: 'referral' }).lean();
+      if (dbConfig) {
+        if (dbConfig.commissionPercentage !== undefined) referralConfig.commissionPercentage = dbConfig.commissionPercentage;
+        if (dbConfig.signupBonus !== undefined) referralConfig.signupBonus = dbConfig.signupBonus;
+        if (dbConfig.enabled !== undefined) referralConfig.enabled = dbConfig.enabled;
+      }
+    }
+  } catch (e) {}
+  res.json(referralConfig);
+};
+
+// @desc    Update referral configuration
+// @route   POST /api/admin/update-referral-config
+const updateReferralConfig = async (req, res) => {
+  const { referralConfig, saveDiskStore } = require('../store');
+  const { commissionPercentage, signupBonus, enabled } = req.body;
+
+  if (commissionPercentage !== undefined) referralConfig.commissionPercentage = parseFloat(commissionPercentage);
+  if (signupBonus !== undefined) referralConfig.signupBonus = parseFloat(signupBonus);
+  if (typeof enabled === 'boolean') referralConfig.enabled = enabled;
+
+  saveDiskStore();
+
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const ConfigModel = mongoose.model('SystemConfig', new mongoose.Schema({}, { strict: false }));
+      await ConfigModel.findOneAndUpdate({ type: 'referral' }, { type: 'referral', ...referralConfig }, { upsert: true, new: true });
+    }
+  } catch (e) {}
+
+  console.log(`[Admin Referral] Updated referral config: ${JSON.stringify(referralConfig)}`);
+  res.json({ success: true, message: 'Referral configuration updated successfully', referralConfig });
+};
+
 module.exports = {
   getStats,
   getUsers,
@@ -768,5 +811,7 @@ module.exports = {
   rejectWithdrawal,
   updateUserWallet,
   getBannerConfig,
-  updateBannerConfig
+  updateBannerConfig,
+  getReferralConfig,
+  updateReferralConfig
 };

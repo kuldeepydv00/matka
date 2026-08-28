@@ -533,6 +533,10 @@ const getReferralDetails = async (req, res) => {
   let grandTotalCommission = 0;
   const processedList = [];
 
+  const { referralConfig } = require('../store');
+  const commRate = (referralConfig.commissionPercentage || 4) / 100;
+  const signupBonus = referralConfig.signupBonus !== undefined ? referralConfig.signupBonus : 50;
+
   for (let ref of rawReferred) {
     const refCleanMob = ref.mobile ? ref.mobile.replace(/[^0-9]/g, '').slice(-10) : '';
     let totalBetStaked = 0;
@@ -543,8 +547,7 @@ const getReferralDetails = async (req, res) => {
       totalBetStaked += userBets.reduce((sum, b) => sum + (parseFloat(b.bet_amount) || 0), 0);
     }
 
-    const signupBonus = 50;
-    const betCommission = parseFloat((totalBetStaked * 0.04).toFixed(2));
+    const betCommission = parseFloat((totalBetStaked * commRate).toFixed(2));
     const totalEarnedFromRef = signupBonus + betCommission;
     grandTotalCommission += totalEarnedFromRef;
 
