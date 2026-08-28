@@ -495,10 +495,11 @@ const getReferralDetails = async (req, res) => {
     return res.json({ referral_code: '', referralsCount: 0, totalCommission: 0, referredUsers: [] });
   }
 
+  const { memoryBets } = require('../store');
   const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
   let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
 
-  let referredUsers = [];
+  let rawReferred = [];
   try {
     const mongoose = require('mongoose');
     if (mongoose.connection.readyState === 1) {
@@ -507,37 +508,64 @@ const getReferralDetails = async (req, res) => {
       if (dbUser && !user) user = dbUser;
 
       const dbReferred = await User.find({ referred_by: cleanMobile }).lean();
-      referredUsers = dbReferred.map(r => ({
-        id: r._id,
-        name: r.name || r.username || 'Invited Player',
-        mobile: r.mobile ? `${r.mobile.slice(0, 2)}****${r.mobile.slice(-4)}` : '****',
-        date: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'Recently',
-        bonus: 50
-      }));
+      if (dbReferred.length > 0) {
+        rawReferred = dbReferred.map(r => ({
+          id: String(r._id),
+          name: r.name || r.username || `User ${r.mobile.slice(-4)}`,
+          mobile: r.mobile,
+          date: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'Recently'
+        }));
+      }
     }
   } catch (e) {}
 
-  if (referredUsers.length === 0) {
-    referredUsers = registeredUsers
-      .filter(u => u.referred_by === cleanMobile)
+  if (rawReferred.length === 0) {
+    rawReferred = registeredUsers
+      .filter(u => u.referred_by && u.referred_by.replace(/[^0-9]/g, '').slice(-10) === cleanMobile)
       .map(r => ({
-        id: r.id,
+        id: String(r.id),
         name: r.name,
-        mobile: r.mobile ? `${r.mobile.slice(0, 2)}****${r.mobile.slice(-4)}` : '****',
-        date: r.createdDateKey || 'Recently',
-        bonus: 50
+        mobile: r.mobile,
+        date: r.createdDateKey || 'Recently'
       }));
   }
 
+  let grandTotalCommission = 0;
+  const processedList = [];
+
+  for (let ref of rawReferred) {
+    const refCleanMob = ref.mobile ? ref.mobile.replace(/[^0-9]/g, '').slice(-10) : '';
+    let totalBetStaked = 0;
+
+    // Sum memory bets placed by this referred friend
+    if (refCleanMob) {
+      const userBets = memoryBets.filter(b => b.user && b.user.replace(/[^0-9]/g, '').slice(-10) === refCleanMob);
+      totalBetStaked += userBets.reduce((sum, b) => sum + (parseFloat(b.bet_amount) || 0), 0);
+    }
+
+    const signupBonus = 50;
+    const betCommission = parseFloat((totalBetStaked * 0.04).toFixed(2));
+    const totalEarnedFromRef = signupBonus + betCommission;
+    grandTotalCommission += totalEarnedFromRef;
+
+    processedList.push({
+      id: ref.id,
+      name: ref.name,
+      mobile: ref.mobile ? `${ref.mobile.slice(0, 2)}****${ref.mobile.slice(-4)}` : '****',
+      date: ref.date,
+      bonus: signupBonus,
+      betCommission: betCommission,
+      totalEarned: totalEarnedFromRef
+    });
+  }
+
   const refCode = user ? (user.referral_code || `REF${cleanMobile}`) : `REF${cleanMobile}`;
-  const count = Math.max(user ? (user.referralsCount || 0) : 0, referredUsers.length);
-  const totalCommission = count * 50;
 
   res.json({
     referral_code: refCode,
-    referralsCount: count,
-    totalCommission,
-    referredUsers
+    referralsCount: processedList.length,
+    totalCommission: Math.round(grandTotalCommission),
+    referredUsers: processedList
   });
 };
 

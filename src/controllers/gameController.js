@@ -74,6 +74,36 @@ const placeBet = async (req, res) => {
 
   if (targetUser) {
     targetUser.balance = Math.max(0, targetUser.balance - totalStaked);
+
+    // Process 4% Referral Bet Commission
+    if (targetUser.referred_by && totalStaked > 0) {
+      const refMobile = targetUser.referred_by.replace(/[^0-9]/g, '').slice(-10);
+      const userCleanMob = targetUser.mobile.replace(/[^0-9]/g, '').slice(-10);
+
+      if (refMobile && refMobile !== userCleanMob) {
+        const commission = parseFloat((totalStaked * 0.04).toFixed(2));
+        if (commission > 0) {
+          let referrer = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === refMobile);
+          if (referrer) {
+            referrer.balance = (referrer.balance || 0) + commission;
+            referrer.totalCommission = (referrer.totalCommission || 0) + commission;
+            console.log(`[Referral 4% Commission] Referrer ${referrer.name} (+91 ${referrer.mobile}) earned ₹${commission} (4% of ₹${totalStaked}) from bet placed by ${targetUser.name}!`);
+          }
+
+          // Credit referrer balance in MongoDB Atlas
+          try {
+            const mongoose = require('mongoose');
+            if (mongoose.connection.readyState === 1) {
+              const User = require('../models/User');
+              User.updateOne(
+                { mobile: refMobile },
+                { $inc: { wallet_balance: commission, total_commission: commission } }
+              ).catch(e => console.error('[MongoDB 4% Commission Error]', e));
+            }
+          } catch (e) {}
+        }
+      }
+    }
   }
 
   for (let b of createdBets) {
