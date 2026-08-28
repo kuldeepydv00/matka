@@ -59,7 +59,6 @@ const registerUser = async (req, res) => {
       referrerMobile = referrer.mobile.slice(-10);
       referrerName = referrer.name;
       referrer.referralsCount = (referrer.referralsCount || 0) + 1;
-      referrer.balance = (referrer.balance || 0) + 50.00;
     } else {
       // Search MongoDB Atlas for referrer
       try {
@@ -81,14 +80,14 @@ const registerUser = async (req, res) => {
 
     if (referrerMobile) {
       user.referred_by = referrerMobile;
-      console.log(`[Referral Reward] ${referrerName} (+91 ${referrerMobile}) earned ₹50 referral bonus for inviting ${user.name}!`);
+      console.log(`[Referral Binding] ${user.name} linked to referrer ${referrerName} (+91 ${referrerMobile}). Referrer will earn lifetime bet commission!`);
 
-      // Credit referrer in MongoDB Atlas
+      // Increment referrer count in MongoDB Atlas
       try {
         const User = require('../models/User');
         User.updateOne(
           { mobile: referrerMobile },
-          { $inc: { wallet_balance: 50, referrals_count: 1 } }
+          { $inc: { referrals_count: 1 } }
         ).catch(e => console.error('[MongoDB Referral Error]', e));
       } catch (e) {}
     }
@@ -696,7 +695,6 @@ const applyReferralCode = async (req, res) => {
     referrerMobile = referrer.mobile.slice(-10);
     referrerName = referrer.name;
     referrer.referralsCount = (referrer.referralsCount || 0) + 1;
-    referrer.balance = (referrer.balance || 0) + 50.00;
   } else {
     try {
       const User = require('../models/User');
@@ -713,7 +711,7 @@ const applyReferralCode = async (req, res) => {
         referrerName = dbRef.name || dbRef.username || 'Referrer';
         await User.updateOne(
           { mobile: dbRef.mobile },
-          { $inc: { wallet_balance: 50, referrals_count: 1 } }
+          { $inc: { referrals_count: 1 } }
         );
       }
     } catch (e) {}
@@ -740,7 +738,7 @@ const applyReferralCode = async (req, res) => {
 
   return res.json({
     success: true,
-    message: `🎉 Referral Code applied successfully! ${referrerName} received ₹50 bonus!`,
+    message: `🎉 Referral Code applied successfully! You are now linked to ${referrerName}.`,
     referred_by: referrerMobile
   });
 };
