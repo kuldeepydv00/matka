@@ -85,27 +85,46 @@ function formatDateKey(dateObj) {
   chartRecords["2026-04-18"] = { "Gali": "69", "Ghaziabad": "62", "Faridabad": "21", "Desawar": "15", "Disawer": "15", "Shri Ganesh": "67" };
   chartRecords["2026-04-19"] = { "Gali": "86", "Ghaziabad": "83", "Faridabad": "49", "Desawar": "93", "Disawer": "93", "Shri Ganesh": "60" };
 
-  // Seed all past historical dates up to yesterday
-  const startDate = new Date(2024, 0, 1);
+  // Seed all past historical dates from 1 Jan 2025 up to yesterday for ALL available markets
+  const startDate = new Date(2025, 0, 1);
   const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
 
   for (let d = new Date(startDate); d <= yesterday; d.setDate(d.getDate() + 1)) {
     const key = formatDateKey(d);
-    if (!chartRecords[key]) {
-      let seed = 0;
-      for (let i = 0; i < key.length; i++) seed += key.charCodeAt(i);
+    let seed = 0;
+    for (let i = 0; i < key.length; i++) seed += key.charCodeAt(i);
 
-      const dswrVal = String((seed * 41 + 83) % 100).padStart(2, '0');
+    const dswrVal = String((seed * 41 + 83) % 100).padStart(2, '0');
+    const shriVal = String((seed * 53 + 29) % 100).padStart(2, '0');
+
+    if (!chartRecords[key]) {
       chartRecords[key] = {
-        "Gali": String((seed * 17 + 13) % 100).padStart(2, '0'),
-        "Ghaziabad": String((seed * 23 + 47) % 100).padStart(2, '0'),
-        "Faridabad": String((seed * 31 + 19) % 100).padStart(2, '0'),
         "Desawar": dswrVal,
         "Disawer": dswrVal,
-        "Shri Ganesh": String((seed * 53 + 29) % 100).padStart(2, '0')
+        "Shiv Parwati": String((seed * 11 + 17) % 100).padStart(2, '0'),
+        "Delhi Bazar": String((seed * 13 + 29) % 100).padStart(2, '0'),
+        "Dubai Market": String((seed * 19 + 37) % 100).padStart(2, '0'),
+        "Shree Ganesh": shriVal,
+        "Shri Ganesh": shriVal,
+        "Faridabad": String((seed * 31 + 19) % 100).padStart(2, '0'),
+        "Ghaziabad": String((seed * 23 + 47) % 100).padStart(2, '0'),
+        "Gali": String((seed * 17 + 13) % 100).padStart(2, '0')
       };
+    } else {
+      // Backfill any missing markets for existing chart dates
+      const rec = chartRecords[key];
+      if (!rec["Desawar"] || rec["Desawar"] === '--') rec["Desawar"] = dswrVal;
+      if (!rec["Disawer"] || rec["Disawer"] === '--') rec["Disawer"] = dswrVal;
+      if (!rec["Shiv Parwati"] || rec["Shiv Parwati"] === '--') rec["Shiv Parwati"] = String((seed * 11 + 17) % 100).padStart(2, '0');
+      if (!rec["Delhi Bazar"] || rec["Delhi Bazar"] === '--') rec["Delhi Bazar"] = String((seed * 13 + 29) % 100).padStart(2, '0');
+      if (!rec["Dubai Market"] || rec["Dubai Market"] === '--') rec["Dubai Market"] = String((seed * 19 + 37) % 100).padStart(2, '0');
+      if (!rec["Shree Ganesh"] || rec["Shree Ganesh"] === '--') rec["Shree Ganesh"] = shriVal;
+      if (!rec["Shri Ganesh"] || rec["Shri Ganesh"] === '--') rec["Shri Ganesh"] = shriVal;
+      if (!rec["Faridabad"] || rec["Faridabad"] === '--') rec["Faridabad"] = String((seed * 31 + 19) % 100).padStart(2, '0');
+      if (!rec["Ghaziabad"] || rec["Ghaziabad"] === '--') rec["Ghaziabad"] = String((seed * 23 + 47) % 100).padStart(2, '0');
+      if (!rec["Gali"] || rec["Gali"] === '--') rec["Gali"] = String((seed * 17 + 13) % 100).padStart(2, '0');
     }
   }
 
