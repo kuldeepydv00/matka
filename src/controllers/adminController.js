@@ -778,17 +778,16 @@ const getAdminBets = async (req, res) => {
 // @desc    Get referral configuration
 // @route   GET /api/admin/referral-config
 const getReferralConfig = async (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   const { referralConfig } = require('../store');
   try {
     const mongoose = require('mongoose');
-    if (mongoose.connection.readyState === 1) {
-      const ConfigModel = mongoose.model('SystemConfig', new mongoose.Schema({}, { strict: false }));
-      const dbConfig = await ConfigModel.findOne({ type: 'referral' }).lean();
-      if (dbConfig) {
-        if (dbConfig.commissionPercentage !== undefined) referralConfig.commissionPercentage = dbConfig.commissionPercentage;
-        if (dbConfig.signupBonus !== undefined) referralConfig.signupBonus = dbConfig.signupBonus;
-        if (dbConfig.enabled !== undefined) referralConfig.enabled = dbConfig.enabled;
-      }
+    const ConfigModel = mongoose.models.SystemConfig || mongoose.model('SystemConfig', new mongoose.Schema({}, { strict: false }));
+    const dbConfig = await ConfigModel.findOne({ type: 'referral' }).lean();
+    if (dbConfig) {
+      if (dbConfig.commissionPercentage !== undefined) referralConfig.commissionPercentage = dbConfig.commissionPercentage;
+      if (dbConfig.signupBonus !== undefined) referralConfig.signupBonus = dbConfig.signupBonus;
+      if (dbConfig.enabled !== undefined) referralConfig.enabled = dbConfig.enabled;
     }
   } catch (e) {}
   res.json(referralConfig);
@@ -808,11 +807,11 @@ const updateReferralConfig = async (req, res) => {
 
   try {
     const mongoose = require('mongoose');
-    if (mongoose.connection.readyState === 1) {
-      const ConfigModel = mongoose.model('SystemConfig', new mongoose.Schema({}, { strict: false }));
-      await ConfigModel.findOneAndUpdate({ type: 'referral' }, { type: 'referral', ...referralConfig }, { upsert: true, new: true });
-    }
-  } catch (e) {}
+    const ConfigModel = mongoose.models.SystemConfig || mongoose.model('SystemConfig', new mongoose.Schema({}, { strict: false }));
+    await ConfigModel.findOneAndUpdate({ type: 'referral' }, { type: 'referral', ...referralConfig }, { upsert: true, new: true });
+  } catch (e) {
+    console.error('[MongoDB Referral Config Save Error]', e);
+  }
 
   console.log(`[Admin Referral] Updated referral config: ${JSON.stringify(referralConfig)}`);
   res.json({ success: true, message: 'Referral configuration updated successfully', referralConfig });
