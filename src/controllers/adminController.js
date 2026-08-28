@@ -687,9 +687,16 @@ const getBannerConfig = async (req, res) => {
     const mongoose = require('mongoose');
     if (mongoose.connection.readyState === 1) {
       const BannerModel = mongoose.model('Banner', new mongoose.Schema({}, { strict: false }));
-      const dbBanner = await BannerModel.findOne({}).lean();
+      const dbBanner = await BannerModel.findOne({}).sort({ updatedAt: -1, _id: -1 }).lean();
       if (dbBanner) {
-        Object.assign(bannerConfig, dbBanner);
+        if (dbBanner.imageUrl !== undefined && dbBanner.imageUrl !== null) {
+          bannerConfig.imageUrl = dbBanner.imageUrl;
+        }
+        if (typeof dbBanner.enabled === 'boolean') bannerConfig.enabled = dbBanner.enabled;
+        if (dbBanner.title) bannerConfig.title = dbBanner.title;
+        if (dbBanner.subtitle) bannerConfig.subtitle = dbBanner.subtitle;
+        if (dbBanner.minDeposit) bannerConfig.minDeposit = dbBanner.minDeposit;
+        if (dbBanner.minWithdrawal) bannerConfig.minWithdrawal = dbBanner.minWithdrawal;
       }
     }
   } catch (e) {}
@@ -718,9 +725,16 @@ const updateBannerConfig = async (req, res) => {
     const mongoose = require('mongoose');
     if (mongoose.connection.readyState === 1) {
       const BannerModel = mongoose.model('Banner', new mongoose.Schema({}, { strict: false }));
-      await BannerModel.findOneAndUpdate({}, bannerConfig, { upsert: true, new: true });
+      await BannerModel.deleteMany({});
+      await BannerModel.create({
+        configId: 'main_banner',
+        ...bannerConfig,
+        updatedAt: new Date()
+      });
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('[MongoDB Banner Sync Error]', e);
+  }
 
   console.log(`[Admin Banner] Updated banner config: ${JSON.stringify(bannerConfig).substring(0, 100)}...`);
   res.json({ success: true, message: 'Banner configuration updated successfully', bannerConfig });
