@@ -496,9 +496,18 @@ const approveDeposit = async (req, res) => {
     userObj = registeredUsers[0];
   }
 
+  let depositBonus = 0;
+  if (dep.amount >= 1000 && userObj && !userObj.firstDepositBonusClaimed) {
+    depositBonus = 200; // Extra ₹200 First Deposit Bonus!
+    userObj.firstDepositBonusClaimed = true;
+    console.log(`[First Deposit Bonus] User ${userObj.name} (+91 ${userObj.mobile}) earned ₹200 Bonus for deposit of ₹${dep.amount}!`);
+  }
+
+  const totalCredit = dep.amount + depositBonus;
+
   let updatedNewBalance = 0;
   if (userObj) {
-    userObj.balance = (userObj.balance || 0) + dep.amount;
+    userObj.balance = (userObj.balance || 0) + totalCredit;
     updatedNewBalance = userObj.balance;
   }
 
@@ -514,9 +523,13 @@ const approveDeposit = async (req, res) => {
       );
 
       if (cleanMobile) {
+        const updateOps = { $inc: { wallet_balance: totalCredit } };
+        if (depositBonus > 0) {
+          updateOps.$set = { first_deposit_bonus_claimed: true };
+        }
         const updatedUser = await User.findOneAndUpdate(
           { mobile: cleanMobile },
-          { $inc: { wallet_balance: dep.amount } },
+          updateOps,
           { new: true }
         );
         if (updatedUser) {
@@ -524,7 +537,7 @@ const approveDeposit = async (req, res) => {
           if (userObj) userObj.balance = updatedUser.wallet_balance;
         }
       }
-      console.log(`[MongoDB Deposit Sync] Credited ₹${dep.amount} to user (+91 ${cleanMobile}). New balance: ₹${updatedNewBalance}`);
+      console.log(`[MongoDB Deposit Sync] Credited ₹${dep.amount}${depositBonus > 0 ? ` (+₹${depositBonus} Bonus)` : ''} to user (+91 ${cleanMobile}). New balance: ₹${updatedNewBalance}`);
     }
   } catch (e) {
     console.error('[MongoDB Approve Deposit Error]', e);
@@ -533,7 +546,7 @@ const approveDeposit = async (req, res) => {
   saveDiskStore();
   res.json({
     success: true,
-    message: `Deposit of ₹${dep.amount} verified & credited to user! New balance: ₹${updatedNewBalance}`,
+    message: `Deposit of ₹${dep.amount}${depositBonus > 0 ? ` (+₹${depositBonus} Bonus)` : ''} verified & credited to user! New balance: ₹${updatedNewBalance}`,
     newBalance: updatedNewBalance,
     deposit: dep
   });

@@ -116,7 +116,8 @@ function saveDiskStore() {
       declaredResultsMap,
       gameSchedulesStore,
       chartRecords,
-      bannerConfig
+      bannerConfig,
+      referralConfig
     };
     fs.writeFileSync(STORE_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
@@ -138,6 +139,7 @@ function loadDiskStore() {
       if (data.gameSchedulesStore) Object.assign(gameSchedulesStore, data.gameSchedulesStore);
       if (data.chartRecords) Object.assign(chartRecords, data.chartRecords);
       if (data.bannerConfig) Object.assign(bannerConfig, data.bannerConfig);
+      if (data.referralConfig) Object.assign(referralConfig, data.referralConfig);
       console.log(`[Disk Store] Successfully loaded disk data! Registered users: ${registeredUsers.length}`);
     }
   } catch (err) {
