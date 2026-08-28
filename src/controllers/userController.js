@@ -508,6 +508,7 @@ const checkUserExists = async (req, res) => {
 // @desc    Get detailed referral statistics & referred users list
 // @route   GET /api/user/referral-details
 const getReferralDetails = async (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   const { mobile } = req.query;
   if (!mobile) {
     return res.json({ referral_code: '', referralsCount: 0, totalCommission: 0, referredUsers: [] });
