@@ -612,6 +612,97 @@ const getReferralDetails = async (req, res) => {
   });
 };
 
+// @desc    Apply a referral code to an existing account that has no referrer
+// @route   POST /api/user/apply-referral
+const applyReferralCode = async (req, res) => {
+  const { mobile, referral_code } = req.body;
+  if (!mobile || !referral_code || !referral_code.trim()) {
+    return res.status(400).json({ success: false, message: 'Mobile and Referral Code are required' });
+  }
+
+  const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
+  const cleanRef = referral_code.trim().toUpperCase().replace('REF', '');
+  const cleanRefMobile = cleanRef.slice(-10);
+
+  if (cleanMobile === cleanRefMobile) {
+    return res.status(400).json({ success: false, message: 'You cannot refer yourself' });
+  }
+
+  let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+
+  try {
+    const User = require('../models/User');
+    const dbUser = await User.findOne({ mobile: { $regex: cleanMobile } });
+    if (dbUser && dbUser.referred_by) {
+      return res.status(400).json({ success: false, message: 'Referral code already applied to this account' });
+    }
+  } catch (e) {}
+
+  if (user && user.referred_by) {
+    return res.status(400).json({ success: false, message: 'Referral code already applied to this account' });
+  }
+
+  let referrerMobile = null;
+  let referrerName = 'Referrer';
+
+  let referrer = registeredUsers.find(u => 
+    u.mobile.slice(-10) === cleanRefMobile || 
+    (u.referral_code && u.referral_code.toUpperCase() === referral_code.trim().toUpperCase())
+  );
+
+  if (referrer && referrer.mobile.slice(-10) !== cleanMobile) {
+    referrerMobile = referrer.mobile.slice(-10);
+    referrerName = referrer.name;
+    referrer.referralsCount = (referrer.referralsCount || 0) + 1;
+    referrer.balance = (referrer.balance || 0) + 50.00;
+  } else {
+    try {
+      const User = require('../models/User');
+      const dbRef = await User.findOne({
+        $or: [
+          { mobile: cleanRefMobile },
+          { referral_code: referral_code.trim().toUpperCase() },
+          { referral_code: `REF${cleanRefMobile}` }
+        ]
+      });
+
+      if (dbRef && dbRef.mobile.slice(-10) !== cleanMobile) {
+        referrerMobile = dbRef.mobile.slice(-10);
+        referrerName = dbRef.name || dbRef.username || 'Referrer';
+        await User.updateOne(
+          { mobile: dbRef.mobile },
+          { $inc: { wallet_balance: 50, referrals_count: 1 } }
+        );
+      }
+    } catch (e) {}
+  }
+
+  if (!referrerMobile) {
+    return res.status(404).json({ success: false, message: 'Invalid Referral Code. Referrer not found.' });
+  }
+
+  if (user) {
+    user.referred_by = referrerMobile;
+  }
+
+  try {
+    const User = require('../models/User');
+    await User.updateOne(
+      { mobile: cleanMobile },
+      { $set: { referred_by: referrerMobile } }
+    );
+  } catch (e) {}
+
+  const { saveDiskStore } = require('../store');
+  saveDiskStore();
+
+  return res.json({
+    success: true,
+    message: `🎉 Referral Code applied successfully! ${referrerName} received ₹50 bonus!`,
+    referred_by: referrerMobile
+  });
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -624,5 +715,6 @@ module.exports = {
   sendSmsOtp,
   verifySmsOtp,
   checkUserExists,
-  getReferralDetails
+  getReferralDetails,
+  applyReferralCode
 };

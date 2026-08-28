@@ -12,11 +12,13 @@ const {
   sendSmsOtp,
   verifySmsOtp,
   checkUserExists,
-  getReferralDetails
+  getReferralDetails,
+  applyReferralCode
 } = require('../controllers/userController');
 
 router.get('/check', checkUserExists);
 router.get('/referral-details', getReferralDetails);
+router.post('/apply-referral', applyReferralCode);
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/send-otp', sendSmsOtp);
