@@ -22,13 +22,15 @@ const {
   getBannerConfig,
   updateBannerConfig,
   getReferralConfig,
-  updateReferralConfig
+  updateReferralConfig,
+  getReferralStats
 } = require('../controllers/adminController');
 
 router.get('/banner', getBannerConfig);
 router.post('/update-banner', updateBannerConfig);
 router.get('/referral-config', getReferralConfig);
 router.post('/update-referral-config', updateReferralConfig);
+router.get('/referral-stats', getReferralStats);
 router.get('/stats', getStats);
 router.get('/users', getUsers);
 router.get('/matrix', getBetMatrix);

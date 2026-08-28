@@ -791,6 +791,91 @@ const updateReferralConfig = async (req, res) => {
   res.json({ success: true, message: 'Referral configuration updated successfully', referralConfig });
 };
 
+// @desc    Get all referrers and referral performance list for Admin Panel
+// @route   GET /api/admin/referral-stats
+const getReferralStats = async (req, res) => {
+  const { memoryBets, registeredUsers, referralConfig } = require('../store');
+  const commRate = (referralConfig.commissionPercentage || 4) / 100;
+  const signupBonus = referralConfig.signupBonus !== undefined ? referralConfig.signupBonus : 50;
+
+  let allUsers = [...registeredUsers];
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const User = require('../models/User');
+      const dbUsers = await User.find({}).lean();
+      dbUsers.forEach(dbu => {
+        const cleanMobile = (dbu.mobile || '').replace(/[^0-9]/g, '').slice(-10);
+        if (cleanMobile) {
+          let exists = allUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+          if (!exists) {
+            allUsers.push({
+              id: String(dbu._id),
+              name: dbu.name || dbu.username || `User ${cleanMobile.slice(-4)}`,
+              mobile: cleanMobile,
+              balance: dbu.wallet_balance || 0,
+              referral_code: dbu.referral_code || `REF${cleanMobile}`,
+              referred_by: dbu.referred_by || null,
+              createdDateKey: dbu.createdAt ? new Date(dbu.createdAt).toISOString().split('T')[0] : 'Today'
+            });
+          } else {
+            if (dbu.referred_by && !exists.referred_by) exists.referred_by = dbu.referred_by;
+          }
+        }
+      });
+    }
+  } catch (e) {}
+
+  const referrersMap = [];
+
+  for (let u of allUsers) {
+    const userCleanMob = u.mobile.replace(/[^0-9]/g, '').slice(-10);
+    const referredFriends = allUsers.filter(r => r.referred_by && r.referred_by.replace(/[^0-9]/g, '').slice(-10) === userCleanMob);
+
+    if (referredFriends.length > 0) {
+      let totalCommissionEarned = 0;
+      const friendsList = [];
+
+      for (let friend of referredFriends) {
+        const friendMob = friend.mobile.replace(/[^0-9]/g, '').slice(-10);
+        const userBets = memoryBets.filter(b => b.user && b.user.replace(/[^0-9]/g, '').slice(-10) === friendMob);
+        const totalStaked = userBets.reduce((sum, b) => sum + (parseFloat(b.bet_amount) || 0), 0);
+        const betComm = parseFloat((totalStaked * commRate).toFixed(2));
+        const totalFromFriend = signupBonus + betComm;
+
+        totalCommissionEarned += totalFromFriend;
+        friendsList.push({
+          name: friend.name,
+          mobile: friend.mobile,
+          signupBonus,
+          totalBets: totalStaked,
+          betCommission: betComm,
+          totalEarned: totalFromFriend
+        });
+      }
+
+      referrersMap.push({
+        id: String(u.id || u.mobile),
+        referrerName: u.name,
+        referrerMobile: u.mobile,
+        referralCode: u.referral_code || `REF${userCleanMob}`,
+        totalReferredCount: referredFriends.length,
+        totalCommissionEarned: Math.round(totalCommissionEarned),
+        friends: friendsList
+      });
+    }
+  }
+
+  referrersMap.sort((a, b) => b.totalCommissionEarned - a.totalCommissionEarned);
+
+  res.json({
+    config: referralConfig,
+    totalReferrersCount: referrersMap.length,
+    totalReferralPayout: referrersMap.reduce((sum, r) => sum + r.totalCommissionEarned, 0),
+    referrers: referrersMap
+  });
+};
+
 module.exports = {
   getStats,
   getUsers,
@@ -813,5 +898,6 @@ module.exports = {
   getBannerConfig,
   updateBannerConfig,
   getReferralConfig,
-  updateReferralConfig
+  updateReferralConfig,
+  getReferralStats
 };
