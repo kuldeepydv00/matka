@@ -239,19 +239,18 @@ const declareGameResult = async (req, res) => {
           targetUser = registeredUsers[0];
         }
         if (targetUser) {
-          targetUser.balance = (targetUser.balance || 0) + payout;
+          targetUser.winning_balance = parseFloat(((targetUser.winning_balance || 0) + payout).toFixed(2));
+          targetUser.balance = parseFloat(((targetUser.deposit_balance || 0) + targetUser.winning_balance + (targetUser.commission_balance || 0)).toFixed(2));
           userWalletStore.balance = targetUser.balance;
 
-          // Sync winning balance to MongoDB Atlas
+          // Sync winning balance & total wallet balance to MongoDB Atlas
           try {
-            const mongoose = require('mongoose');
-            if (mongoose.connection.readyState === 1) {
-              const User = require('../models/User');
-              User.findOneAndUpdate(
-                { mobile: targetUser.mobile },
-                { balance: targetUser.balance }
-              ).catch(e => console.error('[MongoDB Win Sync Error]', e));
-            }
+            const User = require('../models/User');
+            const targetMob = targetUser.mobile.replace(/[^0-9]/g, '').slice(-10);
+            User.updateOne(
+              { mobile: targetMob },
+              { $inc: { winning_balance: payout, wallet_balance: payout } }
+            ).catch(e => console.error('[MongoDB Win Sync Error]', e));
           } catch (e) { }
         }
       } else {

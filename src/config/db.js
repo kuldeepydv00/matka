@@ -24,6 +24,10 @@ const connectDB = async () => {
                 mobile: cleanMobile,
                 password: dbU.password || '123',
                 balance: dbU.wallet_balance || 0.00,
+                deposit_balance: dbU.deposit_balance !== undefined ? dbU.deposit_balance : (dbU.wallet_balance || 0.00),
+                winning_balance: dbU.winning_balance !== undefined ? dbU.winning_balance : 0.00,
+                bonus_balance: dbU.bonus_balance !== undefined ? dbU.bonus_balance : 200.00,
+                commission_balance: dbU.commission_balance !== undefined ? dbU.commission_balance : 0.00,
                 status: 'Active',
                 referral_code: dbU.referral_code || `REF${cleanMobile}`,
                 referred_by: dbU.referred_by || null,
@@ -34,6 +38,10 @@ const connectDB = async () => {
             } else {
               if (dbU.referral_code) existing.referral_code = dbU.referral_code;
               if (dbU.referred_by) existing.referred_by = dbU.referred_by;
+              if (dbU.deposit_balance !== undefined) existing.deposit_balance = dbU.deposit_balance;
+              if (dbU.winning_balance !== undefined) existing.winning_balance = dbU.winning_balance;
+              if (dbU.bonus_balance !== undefined) existing.bonus_balance = dbU.bonus_balance;
+              if (dbU.commission_balance !== undefined) existing.commission_balance = dbU.commission_balance;
               if (dbU.wallet_balance !== undefined && dbU.wallet_balance > existing.balance) {
                 existing.balance = dbU.wallet_balance;
               }

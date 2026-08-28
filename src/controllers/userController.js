@@ -18,6 +18,10 @@ const registerUser = async (req, res) => {
   if (user) {
     user.name = finalName;
     if (!user.referral_code) user.referral_code = ownReferralCode;
+    if (user.bonus_balance === undefined) user.bonus_balance = 200.00;
+    if (user.deposit_balance === undefined) user.deposit_balance = user.balance || 0.00;
+    if (user.winning_balance === undefined) user.winning_balance = 0.00;
+    if (user.commission_balance === undefined) user.commission_balance = 0.00;
   } else {
     user = {
       id: `usr_${Date.now()}`,
@@ -25,6 +29,10 @@ const registerUser = async (req, res) => {
       mobile: cleanMobile,
       password: password || '123',
       balance: 0.00,
+      deposit_balance: 0.00,
+      winning_balance: 0.00,
+      bonus_balance: 200.00,
+      commission_balance: 0.00,
       status: 'Active',
       referral_code: ownReferralCode,
       referred_by: null,
@@ -99,7 +107,14 @@ const registerUser = async (req, res) => {
     await User.findOneAndUpdate(
       { mobile: cleanMobile },
       {
-        $setOnInsert: { wallet_balance: user.balance || 0.00, referral_code: ownReferralCode },
+        $setOnInsert: { 
+          wallet_balance: user.balance || 0.00,
+          deposit_balance: user.deposit_balance !== undefined ? user.deposit_balance : 0.00,
+          winning_balance: user.winning_balance !== undefined ? user.winning_balance : 0.00,
+          bonus_balance: user.bonus_balance !== undefined ? user.bonus_balance : 200.00,
+          commission_balance: user.commission_balance !== undefined ? user.commission_balance : 0.00,
+          referral_code: ownReferralCode 
+        },
         $set: {
           name: user.name,
           username: user.name,
@@ -164,7 +179,7 @@ const getUserProfile = async (req, res) => {
       const mongoose = require('mongoose');
       if (mongoose.connection.readyState === 1) {
         const User = require('../models/User');
-        const dbUser = await User.findOne({ mobile: cleanMobile });
+        const dbUser = await User.findOne({ mobile: cleanMobile }).lean();
         if (dbUser) {
           if (!targetUser) {
             targetUser = {
@@ -172,6 +187,10 @@ const getUserProfile = async (req, res) => {
               name: dbUser.name || dbUser.username || `User ${cleanMobile.slice(-4)}`,
               mobile: cleanMobile,
               balance: dbUser.wallet_balance || 0.00,
+              deposit_balance: dbUser.deposit_balance !== undefined ? dbUser.deposit_balance : (dbUser.wallet_balance || 0.00),
+              winning_balance: dbUser.winning_balance !== undefined ? dbUser.winning_balance : 0.00,
+              bonus_balance: dbUser.bonus_balance !== undefined ? dbUser.bonus_balance : 200.00,
+              commission_balance: dbUser.commission_balance !== undefined ? dbUser.commission_balance : 0.00,
               referral_code: dbUser.referral_code || `REF${cleanMobile}`,
               status: 'Active'
             };
@@ -179,6 +198,10 @@ const getUserProfile = async (req, res) => {
           } else {
             if (dbUser.name && dbUser.name !== 'User') targetUser.name = dbUser.name;
             if (dbUser.wallet_balance !== undefined) targetUser.balance = dbUser.wallet_balance;
+            if (dbUser.deposit_balance !== undefined) targetUser.deposit_balance = dbUser.deposit_balance;
+            if (dbUser.winning_balance !== undefined) targetUser.winning_balance = dbUser.winning_balance;
+            if (dbUser.bonus_balance !== undefined) targetUser.bonus_balance = dbUser.bonus_balance;
+            if (dbUser.commission_balance !== undefined) targetUser.commission_balance = dbUser.commission_balance;
             if (!targetUser.referral_code) targetUser.referral_code = dbUser.referral_code || `REF${cleanMobile}`;
           }
         }
@@ -190,12 +213,17 @@ const getUserProfile = async (req, res) => {
     if (!targetUser.referral_code && targetUser.mobile) {
       targetUser.referral_code = `REF${targetUser.mobile.slice(-10)}`;
     }
+    if (targetUser.bonus_balance === undefined) targetUser.bonus_balance = 200.00;
+    if (targetUser.deposit_balance === undefined) targetUser.deposit_balance = targetUser.balance || 0.00;
+    if (targetUser.winning_balance === undefined) targetUser.winning_balance = 0.00;
+    if (targetUser.commission_balance === undefined) targetUser.commission_balance = 0.00;
+    targetUser.withdrawable_balance = targetUser.winning_balance;
+
     return res.json(targetUser);
   }
-  res.json({ name: 'User', mobile: mobile || '', balance: 0.00, referral_code: 'REF1234567890' });
+  res.json({ name: 'User', mobile: mobile || '', balance: 0.00, deposit_balance: 0.00, winning_balance: 0.00, bonus_balance: 200.00, commission_balance: 0.00, withdrawable_balance: 0.00, referral_code: 'REF1234567890' });
 };
 
-// @desc    Get live wallet balance
 // @desc    Get live wallet balance
 // @route   GET /api/user/wallet/balance
 const getWalletBalance = async (req, res) => {
@@ -206,24 +234,29 @@ const getWalletBalance = async (req, res) => {
     targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
 
     try {
-      const mongoose = require('mongoose');
-      if (mongoose.connection.readyState === 1) {
-        const User = require('../models/User');
-        const dbUser = await User.findOne({ mobile: cleanMobile });
-        if (dbUser) {
-          if (!targetUser) {
-            targetUser = {
-              id: dbUser._id,
-              name: dbUser.name || dbUser.username || `User ${cleanMobile.slice(-4)}`,
-              mobile: cleanMobile,
-              balance: dbUser.wallet_balance || 0.00,
-              status: 'Active'
-            };
-            registeredUsers.push(targetUser);
-          } else {
-            if (dbUser.name && dbUser.name !== 'User') targetUser.name = dbUser.name;
-            if (dbUser.wallet_balance !== undefined) targetUser.balance = dbUser.wallet_balance;
-          }
+      const User = require('../models/User');
+      const dbUser = await User.findOne({ mobile: cleanMobile }).lean();
+      if (dbUser) {
+        if (!targetUser) {
+          targetUser = {
+            id: dbUser._id,
+            name: dbUser.name || dbUser.username || `User ${cleanMobile.slice(-4)}`,
+            mobile: cleanMobile,
+            balance: dbUser.wallet_balance || 0.00,
+            deposit_balance: dbUser.deposit_balance || 0.00,
+            winning_balance: dbUser.winning_balance || 0.00,
+            bonus_balance: dbUser.bonus_balance !== undefined ? dbUser.bonus_balance : 200.00,
+            commission_balance: dbUser.commission_balance || 0.00,
+            status: 'Active'
+          };
+          registeredUsers.push(targetUser);
+        } else {
+          if (dbUser.name && dbUser.name !== 'User') targetUser.name = dbUser.name;
+          if (dbUser.wallet_balance !== undefined) targetUser.balance = dbUser.wallet_balance;
+          if (dbUser.deposit_balance !== undefined) targetUser.deposit_balance = dbUser.deposit_balance;
+          if (dbUser.winning_balance !== undefined) targetUser.winning_balance = dbUser.winning_balance;
+          if (dbUser.bonus_balance !== undefined) targetUser.bonus_balance = dbUser.bonus_balance;
+          if (dbUser.commission_balance !== undefined) targetUser.commission_balance = dbUser.commission_balance;
         }
       }
     } catch (e) { }
@@ -231,7 +264,15 @@ const getWalletBalance = async (req, res) => {
 
   const currentBal = targetUser ? (targetUser.balance || 0.00) : 0.00;
   const currentName = targetUser ? targetUser.name : null;
-  res.json({ balance: currentBal, name: currentName });
+  res.json({
+    balance: currentBal,
+    deposit_balance: targetUser ? (targetUser.deposit_balance || 0.00) : 0.00,
+    winning_balance: targetUser ? (targetUser.winning_balance || 0.00) : 0.00,
+    bonus_balance: targetUser ? (targetUser.bonus_balance !== undefined ? targetUser.bonus_balance : 200.00) : 200.00,
+    commission_balance: targetUser ? (targetUser.commission_balance || 0.00) : 0.00,
+    withdrawable_balance: targetUser ? (targetUser.winning_balance || 0.00) : 0.00,
+    name: currentName
+  });
 };
 
 // @desc    Update wallet balance
@@ -352,22 +393,28 @@ const requestWithdrawal = async (req, res) => {
     targetUser = registeredUsers[0];
   }
 
-  if (targetUser && (targetUser.balance || 0) < numAmt) {
-    return res.status(400).json({ success: false, message: `Insufficient wallet balance. Available balance: ₹${targetUser.balance.toFixed(2)}` });
+  const withdrawable = targetUser ? (targetUser.winning_balance || 0.00) : 0.00;
+
+  if (numAmt > withdrawable) {
+    return res.status(400).json({ 
+      success: false, 
+      message: `You can only withdraw your winning balance. Withdrawable balance: ₹${withdrawable.toFixed(2)}` 
+    });
   }
 
-  // Deduct balance from user wallet
+  // Deduct withdrawal amount from user winning balance & total wallet balance
   if (targetUser) {
-    targetUser.balance = (targetUser.balance || 0) - numAmt;
+    targetUser.winning_balance = parseFloat((targetUser.winning_balance - numAmt).toFixed(2));
+    targetUser.balance = parseFloat(((targetUser.deposit_balance || 0) + targetUser.winning_balance + (targetUser.commission_balance || 0)).toFixed(2));
     userWalletStore.balance = targetUser.balance;
 
     // Sync to MongoDB Atlas
     try {
-      const mongoose = require('mongoose');
-      if (mongoose.connection.readyState === 1) {
-        const User = require('../models/User');
-        await User.updateOne({ mobile: targetUser.mobile }, { $set: { wallet_balance: targetUser.balance } });
-      }
+      const User = require('../models/User');
+      User.updateOne(
+        { mobile: targetUser.mobile }, 
+        { $set: { winning_balance: targetUser.winning_balance, wallet_balance: targetUser.balance } }
+      ).catch(e => console.error('[MongoDB Withdraw Sync Error]', e));
     } catch (e) {}
   }
 

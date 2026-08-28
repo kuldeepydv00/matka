@@ -73,7 +73,64 @@ const placeBet = async (req, res) => {
   }
 
   if (targetUser) {
-    targetUser.balance = Math.max(0, targetUser.balance - totalStaked);
+    // 1. Calculate 10% max bonus deduction
+    if (targetUser.bonus_balance === undefined) targetUser.bonus_balance = 200.00;
+    if (targetUser.deposit_balance === undefined) targetUser.deposit_balance = targetUser.balance || 0.00;
+    if (targetUser.winning_balance === undefined) targetUser.winning_balance = 0.00;
+    if (targetUser.commission_balance === undefined) targetUser.commission_balance = 0.00;
+
+    const maxBonusUsable = totalStaked * 0.10;
+    const bonusUsed = Math.min(maxBonusUsable, targetUser.bonus_balance);
+    targetUser.bonus_balance = parseFloat((targetUser.bonus_balance - bonusUsed).toFixed(2));
+
+    let remainingRequired = totalStaked - bonusUsed;
+
+    // 2. Deduct from Deposit & Winning balance first
+    if (remainingRequired > 0) {
+      if (targetUser.deposit_balance >= remainingRequired) {
+        targetUser.deposit_balance = parseFloat((targetUser.deposit_balance - remainingRequired).toFixed(2));
+        remainingRequired = 0;
+      } else {
+        remainingRequired -= targetUser.deposit_balance;
+        targetUser.deposit_balance = 0.00;
+
+        if (targetUser.winning_balance >= remainingRequired) {
+          targetUser.winning_balance = parseFloat((targetUser.winning_balance - remainingRequired).toFixed(2));
+          remainingRequired = 0;
+        } else {
+          remainingRequired -= targetUser.winning_balance;
+          targetUser.winning_balance = 0.00;
+        }
+      }
+    }
+
+    // 3. If Available balance is 0/insufficient, deduct remaining from Commission balance
+    if (remainingRequired > 0 && targetUser.commission_balance > 0) {
+      const commDeduct = Math.min(remainingRequired, targetUser.commission_balance);
+      targetUser.commission_balance = parseFloat((targetUser.commission_balance - commDeduct).toFixed(2));
+      remainingRequired -= commDeduct;
+    }
+
+    // Update aggregate main balance
+    targetUser.balance = parseFloat((targetUser.deposit_balance + targetUser.winning_balance + targetUser.commission_balance).toFixed(2));
+
+    // Sync multi-wallet state in MongoDB Atlas
+    try {
+      const User = require('../models/User');
+      const cleanUserMob = targetUser.mobile.replace(/[^0-9]/g, '').slice(-10);
+      User.updateOne(
+        { mobile: cleanUserMob },
+        {
+          $set: {
+            deposit_balance: targetUser.deposit_balance,
+            winning_balance: targetUser.winning_balance,
+            bonus_balance: targetUser.bonus_balance,
+            commission_balance: targetUser.commission_balance,
+            wallet_balance: targetUser.balance
+          }
+        }
+      ).catch(e => console.error('[MongoDB Wallet Sync Error]', e));
+    } catch (e) {}
 
     // Process Dynamic Referral Bet Commission
     const { referralConfig } = require('../store');
@@ -87,21 +144,21 @@ const placeBet = async (req, res) => {
         if (commission > 0) {
           let referrer = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === refMobile);
           if (referrer) {
-            referrer.balance = (referrer.balance || 0) + commission;
+            referrer.commission_balance = parseFloat(((referrer.commission_balance || 0) + commission).toFixed(2));
+            referrer.balance = parseFloat(((referrer.deposit_balance || 0) + (referrer.winning_balance || 0) + referrer.commission_balance).toFixed(2));
             referrer.totalCommission = (referrer.totalCommission || 0) + commission;
             console.log(`[Referral Commission] Referrer ${referrer.name} (+91 ${referrer.mobile}) earned ₹${commission} (${referralConfig.commissionPercentage}% of ₹${totalStaked}) from bet by ${targetUser.name}!`);
           }
 
-          // Credit referrer balance in MongoDB Atlas
+          // Credit referrer commission balance in MongoDB Atlas
           try {
-            const mongoose = require('mongoose');
-            if (mongoose.connection.readyState === 1) {
-              const User = require('../models/User');
-              User.updateOne(
-                { mobile: refMobile },
-                { $inc: { wallet_balance: commission, total_commission: commission } }
-              ).catch(e => console.error('[MongoDB 4% Commission Error]', e));
-            }
+            const User = require('../models/User');
+            User.updateOne(
+              { mobile: refMobile },
+              { 
+                $inc: { commission_balance: commission, wallet_balance: commission, total_commission: commission } 
+              }
+            ).catch(e => console.error('[MongoDB 4% Commission Error]', e));
           } catch (e) {}
         }
       }
