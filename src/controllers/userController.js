@@ -520,6 +520,9 @@ const getReferralDetails = async (req, res) => {
   let rawReferred = [];
   try {
     const User = require('../models/User');
+    const allDbUsers = await User.find({}).lean();
+    console.log(`[Referral DB Debug] Total DB users: ${allDbUsers.length}`, JSON.stringify(allDbUsers.map(u => ({ name: u.name, mobile: u.mobile, referred_by: u.referred_by, referral_code: u.referral_code }))));
+
     const dbUser = await User.findOne({ mobile: { $regex: cleanMobile } }).lean();
     if (dbUser && !user) user = dbUser;
 
