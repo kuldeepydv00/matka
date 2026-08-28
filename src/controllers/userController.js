@@ -69,10 +69,6 @@ const registerUser = async (req, res) => {
           if (dbRef && dbRef.mobile.slice(-10) !== cleanMobile) {
             referrerMobile = dbRef.mobile.slice(-10);
             referrerName = dbRef.name || dbRef.username || 'Referrer';
-            await User.updateOne(
-              { mobile: dbRef.mobile },
-              { $inc: { wallet_balance: 50, referrals_count: 1 } }
-            );
           }
         }
       } catch (e) {}
@@ -81,6 +77,18 @@ const registerUser = async (req, res) => {
     if (referrerMobile) {
       user.referred_by = referrerMobile;
       console.log(`[Referral Reward] ${referrerName} (+91 ${referrerMobile}) earned ₹50 referral bonus for inviting ${user.name}!`);
+
+      // Credit referrer in MongoDB Atlas
+      try {
+        const mongoose = require('mongoose');
+        if (mongoose.connection.readyState === 1) {
+          const User = require('../models/User');
+          User.updateOne(
+            { mobile: referrerMobile },
+            { $inc: { wallet_balance: 50, referrals_count: 1 } }
+          ).catch(e => console.error('[MongoDB Referral Error]', e));
+        }
+      } catch (e) {}
     }
   }
 
