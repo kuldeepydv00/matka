@@ -79,12 +79,32 @@
       "status": "Active",
       "createdAt": "01:09 AM",
       "createdDateKey": "2026-08-23"
+    },
+    {
+      "id": "usr_1787899349319",
+      "name": "null",
+      "mobile": "2122222122",
+      "password": "123",
+      "balance": 0,
+      "status": "Active",
+      "createdAt": "12:12 PM",
+      "createdDateKey": "2026-08-28"
+    },
+    {
+      "id": "usr_1787899613765",
+      "name": "ww",
+      "mobile": "1111111119",
+      "password": "123",
+      "balance": 0,
+      "status": "Active",
+      "createdAt": "12:16 PM",
+      "createdDateKey": "2026-08-28"
     }
   ],
   "userWalletStore": {
-    "balance": 1000,
-    "name": "Qp",
-    "mobile": "1472580369"
+    "balance": 0,
+    "name": "ww",
+    "mobile": "1111111119"
   },
   "memoryDeposits": [
     {

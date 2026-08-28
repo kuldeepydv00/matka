@@ -11,10 +11,12 @@ const {
   requestWithdrawal,
   sendSmsOtp,
   verifySmsOtp,
-  checkUserExists
+  checkUserExists,
+  getReferralDetails
 } = require('../controllers/userController');
 
 router.get('/check', checkUserExists);
+router.get('/referral-details', getReferralDetails);
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/send-otp', sendSmsOtp);

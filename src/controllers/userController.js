@@ -487,6 +487,60 @@ const checkUserExists = async (req, res) => {
   return res.json({ exists: false });
 };
 
+// @desc    Get detailed referral statistics & referred users list
+// @route   GET /api/user/referral-details
+const getReferralDetails = async (req, res) => {
+  const { mobile } = req.query;
+  if (!mobile) {
+    return res.json({ referral_code: '', referralsCount: 0, totalCommission: 0, referredUsers: [] });
+  }
+
+  const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
+  let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+
+  let referredUsers = [];
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const User = require('../models/User');
+      const dbUser = await User.findOne({ mobile: cleanMobile }).lean();
+      if (dbUser && !user) user = dbUser;
+
+      const dbReferred = await User.find({ referred_by: cleanMobile }).lean();
+      referredUsers = dbReferred.map(r => ({
+        id: r._id,
+        name: r.name || r.username || 'Invited Player',
+        mobile: r.mobile ? `${r.mobile.slice(0, 2)}****${r.mobile.slice(-4)}` : '****',
+        date: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'Recently',
+        bonus: 50
+      }));
+    }
+  } catch (e) {}
+
+  if (referredUsers.length === 0) {
+    referredUsers = registeredUsers
+      .filter(u => u.referred_by === cleanMobile)
+      .map(r => ({
+        id: r.id,
+        name: r.name,
+        mobile: r.mobile ? `${r.mobile.slice(0, 2)}****${r.mobile.slice(-4)}` : '****',
+        date: r.createdDateKey || 'Recently',
+        bonus: 50
+      }));
+  }
+
+  const refCode = user ? (user.referral_code || `REF${cleanMobile}`) : `REF${cleanMobile}`;
+  const count = Math.max(user ? (user.referralsCount || 0) : 0, referredUsers.length);
+  const totalCommission = count * 50;
+
+  res.json({
+    referral_code: refCode,
+    referralsCount: count,
+    totalCommission,
+    referredUsers
+  });
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -498,5 +552,6 @@ module.exports = {
   requestWithdrawal,
   sendSmsOtp,
   verifySmsOtp,
-  checkUserExists
+  checkUserExists,
+  getReferralDetails
 };
