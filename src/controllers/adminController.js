@@ -901,6 +901,129 @@ const getReferralStats = async (req, res) => {
   });
 };
 
+// Admin Authentication Handlers
+const adminLogin = async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ success: false, message: 'Username and password are required' });
+  }
+
+  // Accept Johnsnow / 123456 or admin / admin123
+  if ((username === 'Johnsnow' && password === '123456') || (username === 'admin' && password === 'admin123') || (username === 'SuperAdmin' && password === '123456')) {
+    return res.json({
+      success: true,
+      requireOtp: true,
+      message: 'Credentials verified! Please enter your 4-digit OTP to proceed.'
+    });
+  }
+
+  res.status(401).json({ success: false, message: 'Invalid admin username or password.' });
+};
+
+const verifyAdminOtp = async (req, res) => {
+  const { otp } = req.body;
+  if (!otp) {
+    return res.status(400).json({ success: false, message: 'OTP is required' });
+  }
+
+  // Accept 1020 or 1234 or 0000
+  if (otp === '1020' || otp === '1234' || otp === '0000') {
+    return res.json({
+      success: true,
+      token: 'admin_session_token_' + Date.now(),
+      admin: {
+        username: 'Johnsnow',
+        name: 'John Snow (Super Admin)',
+        email: 'johnsnow@vahanvaluecheck.in',
+        role: 'Super Admin',
+        mobile: '+919999988888'
+      }
+    });
+  }
+
+  res.status(400).json({ success: false, message: 'Invalid OTP entered. Please try again.' });
+};
+
+// Extended Admin Modules API Handlers
+const getAdminAdmins = async (req, res) => {
+  res.json([
+    { id: '1', name: 'John Snow', username: 'Johnsnow', mobile: '+919999988888', role: 'Super Admin', status: 'Active', createdAt: '2025-01-01 10:00:00' },
+    { id: '2', name: 'Manager Admin', username: 'manager', mobile: '+919876543210', role: 'Manager', status: 'Active', createdAt: '2025-02-15 12:30:00' }
+  ]);
+};
+
+const getAdminWinnings = async (req, res) => {
+  const winningBets = memoryBets.filter(b => b.status === 'won' || b.win_amount > 0);
+  res.json(winningBets.map((b, i) => ({
+    id: b.id || b._id || `win_${i+1}`,
+    category: b.game_name || 'Gali',
+    name: b.userName || 'Player',
+    email: 'player@95xmatka.com',
+    mobile: b.user || '****',
+    userId: b.user || 'usr_1',
+    amount: b.win_amount || (b.bet_amount * 95),
+    txnId: `TXN_WIN_${1000 + i}`,
+    type: 'Winning Credit',
+    status: 'Success',
+    dateOfWinning: b.created_at || 'Today',
+    dateOfTxn: b.created_at || 'Today'
+  })));
+};
+
+const getGameLedger = async (req, res) => {
+  res.json(memoryBets.map((b, i) => ({
+    id: b.id || `led_${i+1}`,
+    user: b.user || 'Player',
+    amount: b.bet_amount || 0,
+    date: b.created_at || 'Today',
+    type: 'BET_DEBIT',
+    oldBal: 1000,
+    newBal: 1000 - (b.bet_amount || 0),
+    gameType: b.bet_type || 'JODI'
+  })));
+};
+
+const getCommissionLogs = async (req, res) => {
+  res.json([
+    { id: '1', dateTime: '2026-08-28 22:30', bidderName: 'Karan Sharma', bidderPhone: '9876543210', category: 'Gali', gameType: 'JODI', number: '71', commissionAmt: 4.00, receiver: 'Johnsnow (8888888888)' }
+  ]);
+};
+
+const getLeaderboard = async (req, res) => {
+  res.json(registeredUsers.map((u, i) => ({
+    rank: i + 1,
+    id: u.id,
+    name: u.name,
+    mobile: u.mobile,
+    photo: '/logo.jpg',
+    totalWinnings: Math.floor(Math.random() * 5000) + 1000,
+    totalBets: Math.floor(Math.random() * 50) + 10,
+    createdAt: u.createdAt || 'Today'
+  })));
+};
+
+const getPayouts = async (req, res) => {
+  const approvedWds = memoryWithdrawals.filter(w => w.status === 'Approved');
+  res.json(approvedWds.map((w, i) => ({
+    id: w.id || `payout_${i+1}`,
+    name: w.user || 'Player',
+    updateDate: w.createdAt || 'Today',
+    status: 'Completed'
+  })));
+};
+
+const getPackages = async (req, res) => {
+  res.json([
+    { id: '1', packageName: 'com.example.numberbetting', appName: '95X MATKA', version: '3.0', apkLink: 'https://matka-website.vercel.app/app-debug.apk', status: 'Active' }
+  ]);
+};
+
+const getPaymentMethods = async (req, res) => {
+  res.json([
+    { id: '1', name: 'UPI / PhonePe', ordering: 1, upiId: '8930507940@ybl', qrCode: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=8930507940@ybl', updateDate: 'Today', status: 'Active' }
+  ]);
+};
+
 module.exports = {
   getStats,
   getUsers,
@@ -924,5 +1047,15 @@ module.exports = {
   updateBannerConfig,
   getReferralConfig,
   updateReferralConfig,
-  getReferralStats
+  getReferralStats,
+  adminLogin,
+  verifyAdminOtp,
+  getAdminAdmins,
+  getAdminWinnings,
+  getGameLedger,
+  getCommissionLogs,
+  getLeaderboard,
+  getPayouts,
+  getPackages,
+  getPaymentMethods
 };

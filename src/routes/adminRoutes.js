@@ -23,8 +23,29 @@ const {
   updateBannerConfig,
   getReferralConfig,
   updateReferralConfig,
-  getReferralStats
+  getReferralStats,
+  adminLogin,
+  verifyAdminOtp,
+  getAdminAdmins,
+  getAdminWinnings,
+  getGameLedger,
+  getCommissionLogs,
+  getLeaderboard,
+  getPayouts,
+  getPackages,
+  getPaymentMethods
 } = require('../controllers/adminController');
+
+router.post('/login', adminLogin);
+router.post('/verify-otp', verifyAdminOtp);
+router.get('/admins', getAdminAdmins);
+router.get('/winnings', getAdminWinnings);
+router.get('/game-ledger', getGameLedger);
+router.get('/commission-logs', getCommissionLogs);
+router.get('/leaderboard', getLeaderboard);
+router.get('/payouts', getPayouts);
+router.get('/packages', getPackages);
+router.get('/payment-methods', getPaymentMethods);
 
 router.get('/banner', getBannerConfig);
 router.post('/update-banner', updateBannerConfig);
