@@ -528,30 +528,30 @@ const getReferralDetails = async (req, res) => {
 
   let rawReferred = [];
   try {
-    const mongoose = require('mongoose');
-    if (mongoose.connection.readyState === 1) {
-      const User = require('../models/User');
-      const dbUser = await User.findOne({ mobile: cleanMobile }).lean();
-      if (dbUser && !user) user = dbUser;
+    const User = require('../models/User');
+    const dbUser = await User.findOne({ mobile: { $regex: cleanMobile } }).lean();
+    if (dbUser && !user) user = dbUser;
 
-      const dbReferred = await User.find({
-        $or: [
-          { referred_by: cleanMobile },
-          { referred_by: `+91${cleanMobile}` },
-          { referred_by: `REF${cleanMobile}` }
-        ]
-      }).lean();
+    const dbReferred = await User.find({
+      $or: [
+        { referred_by: cleanMobile },
+        { referred_by: `+91${cleanMobile}` },
+        { referred_by: `REF${cleanMobile}` },
+        { referred_by: { $regex: cleanMobile } }
+      ]
+    }).lean();
 
-      if (dbReferred.length > 0) {
-        rawReferred = dbReferred.map(r => ({
-          id: String(r._id),
-          name: r.name || r.username || `User ${r.mobile.slice(-4)}`,
-          mobile: r.mobile,
-          date: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'Recently'
-        }));
-      }
+    if (dbReferred && dbReferred.length > 0) {
+      rawReferred = dbReferred.map(r => ({
+        id: String(r._id),
+        name: r.name || r.username || `User ${r.mobile.slice(-4)}`,
+        mobile: r.mobile,
+        date: r.createdAt ? new Date(r.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : 'Recently'
+      }));
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('[MongoDB Referral Search Error]', e);
+  }
 
   // Merge any memory registered users
   const memoryReferred = registeredUsers
