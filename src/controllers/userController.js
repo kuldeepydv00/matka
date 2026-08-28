@@ -37,28 +37,48 @@ const registerUser = async (req, res) => {
     if (referral_code && referral_code.trim()) {
       const cleanRef = referral_code.trim().toUpperCase().replace('REF', '');
       const cleanRefMobile = cleanRef.slice(-10);
+      let referrerMobile = null;
+      let referrerName = 'Referrer';
+
       let referrer = registeredUsers.find(u => 
         u.mobile.slice(-10) === cleanRefMobile || 
         (u.referral_code && u.referral_code.toUpperCase() === referral_code.trim().toUpperCase())
       );
 
-      if (referrer && referrer.mobile !== cleanMobile) {
-        user.referred_by = referrer.mobile;
+      if (referrer && referrer.mobile.slice(-10) !== cleanMobile) {
+        referrerMobile = referrer.mobile.slice(-10);
+        referrerName = referrer.name;
         referrer.referralsCount = (referrer.referralsCount || 0) + 1;
-        referrer.balance = (referrer.balance || 0) + 50.00; // ₹50 Referral Bonus!
-        console.log(`[Referral Reward] ${referrer.name} (+91 ${referrer.mobile}) earned ₹50 referral bonus for inviting ${user.name}!`);
-
-        // Credit referrer in MongoDB Atlas
+        referrer.balance = (referrer.balance || 0) + 50.00;
+      } else {
+        // Search MongoDB Atlas for referrer
         try {
           const mongoose = require('mongoose');
           if (mongoose.connection.readyState === 1) {
             const User = require('../models/User');
-            User.updateOne(
-              { mobile: referrer.mobile },
-              { $inc: { wallet_balance: 50, referrals_count: 1 } }
-            ).catch(e => console.error('[MongoDB Referral Error]', e));
+            const dbRef = await User.findOne({
+              $or: [
+                { mobile: cleanRefMobile },
+                { referral_code: referral_code.trim().toUpperCase() },
+                { referral_code: `REF${cleanRefMobile}` }
+              ]
+            }).lean();
+
+            if (dbRef && dbRef.mobile.slice(-10) !== cleanMobile) {
+              referrerMobile = dbRef.mobile.slice(-10);
+              referrerName = dbRef.name || dbRef.username || 'Referrer';
+              await User.updateOne(
+                { mobile: dbRef.mobile },
+                { $inc: { wallet_balance: 50, referrals_count: 1 } }
+              );
+            }
           }
         } catch (e) {}
+      }
+
+      if (referrerMobile) {
+        user.referred_by = referrerMobile;
+        console.log(`[Referral Reward] ${referrerName} (+91 ${referrerMobile}) earned ₹50 referral bonus for inviting ${user.name}!`);
       }
     }
 
@@ -507,7 +527,14 @@ const getReferralDetails = async (req, res) => {
       const dbUser = await User.findOne({ mobile: cleanMobile }).lean();
       if (dbUser && !user) user = dbUser;
 
-      const dbReferred = await User.find({ referred_by: cleanMobile }).lean();
+      const dbReferred = await User.find({
+        $or: [
+          { referred_by: cleanMobile },
+          { referred_by: `+91${cleanMobile}` },
+          { referred_by: `REF${cleanMobile}` }
+        ]
+      }).lean();
+
       if (dbReferred.length > 0) {
         rawReferred = dbReferred.map(r => ({
           id: String(r._id),
@@ -519,15 +546,21 @@ const getReferralDetails = async (req, res) => {
     }
   } catch (e) {}
 
-  if (rawReferred.length === 0) {
-    rawReferred = registeredUsers
-      .filter(u => u.referred_by && u.referred_by.replace(/[^0-9]/g, '').slice(-10) === cleanMobile)
-      .map(r => ({
-        id: String(r.id),
-        name: r.name,
-        mobile: r.mobile,
-        date: r.createdDateKey || 'Recently'
-      }));
+  // Merge any memory registered users
+  const memoryReferred = registeredUsers
+    .filter(u => u.referred_by && u.referred_by.replace(/[^0-9]/g, '').slice(-10) === cleanMobile)
+    .map(r => ({
+      id: String(r.id),
+      name: r.name,
+      mobile: r.mobile,
+      date: r.createdDateKey || 'Recently'
+    }));
+
+  for (let mem of memoryReferred) {
+    const memClean = mem.mobile ? mem.mobile.replace(/[^0-9]/g, '').slice(-10) : '';
+    if (memClean && !rawReferred.some(r => r.mobile && r.mobile.replace(/[^0-9]/g, '').slice(-10) === memClean)) {
+      rawReferred.push(mem);
+    }
   }
 
   let grandTotalCommission = 0;
