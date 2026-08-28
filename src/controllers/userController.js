@@ -55,21 +55,18 @@ const registerUser = async (req, res) => {
     } else {
       // Search MongoDB Atlas for referrer
       try {
-        const mongoose = require('mongoose');
-        if (mongoose.connection.readyState === 1) {
-          const User = require('../models/User');
-          const dbRef = await User.findOne({
-            $or: [
-              { mobile: cleanRefMobile },
-              { referral_code: referral_code.trim().toUpperCase() },
-              { referral_code: `REF${cleanRefMobile}` }
-            ]
-          }).lean();
+        const User = require('../models/User');
+        const dbRef = await User.findOne({
+          $or: [
+            { mobile: cleanRefMobile },
+            { referral_code: referral_code.trim().toUpperCase() },
+            { referral_code: `REF${cleanRefMobile}` }
+          ]
+        }).lean();
 
-          if (dbRef && dbRef.mobile.slice(-10) !== cleanMobile) {
-            referrerMobile = dbRef.mobile.slice(-10);
-            referrerName = dbRef.name || dbRef.username || 'Referrer';
-          }
+        if (dbRef && dbRef.mobile.slice(-10) !== cleanMobile) {
+          referrerMobile = dbRef.mobile.slice(-10);
+          referrerName = dbRef.name || dbRef.username || 'Referrer';
         }
       } catch (e) {}
     }
@@ -80,14 +77,11 @@ const registerUser = async (req, res) => {
 
       // Credit referrer in MongoDB Atlas
       try {
-        const mongoose = require('mongoose');
-        if (mongoose.connection.readyState === 1) {
-          const User = require('../models/User');
-          User.updateOne(
-            { mobile: referrerMobile },
-            { $inc: { wallet_balance: 50, referrals_count: 1 } }
-          ).catch(e => console.error('[MongoDB Referral Error]', e));
-        }
+        const User = require('../models/User');
+        User.updateOne(
+          { mobile: referrerMobile },
+          { $inc: { wallet_balance: 50, referrals_count: 1 } }
+        ).catch(e => console.error('[MongoDB Referral Error]', e));
       } catch (e) {}
     }
   }
@@ -101,26 +95,23 @@ const registerUser = async (req, res) => {
 
   // Save/Update registered user into MongoDB Atlas Database
   try {
-    const mongoose = require('mongoose');
-    if (mongoose.connection.readyState === 1) {
-      const User = require('../models/User');
-      await User.findOneAndUpdate(
-        { mobile: cleanMobile },
-        {
-          $setOnInsert: { wallet_balance: user.balance || 0.00, referral_code: ownReferralCode },
-          $set: {
-            name: user.name,
-            username: user.name,
-            mobile: cleanMobile,
-            password: user.password || '123',
-            referral_code: ownReferralCode,
-            referred_by: user.referred_by || null
-          }
-        },
-        { upsert: true, new: true }
-      );
-      console.log(`[MongoDB] Registered/Synced user in Cloud Database: ${user.name} (+91 ${cleanMobile})`);
-    }
+    const User = require('../models/User');
+    await User.findOneAndUpdate(
+      { mobile: cleanMobile },
+      {
+        $setOnInsert: { wallet_balance: user.balance || 0.00, referral_code: ownReferralCode },
+        $set: {
+          name: user.name,
+          username: user.name,
+          mobile: cleanMobile,
+          password: user.password || '123',
+          referral_code: ownReferralCode,
+          referred_by: user.referred_by || null
+        }
+      },
+      { upsert: true, new: true }
+    );
+    console.log(`[MongoDB] Registered/Synced user in Cloud Database: ${user.name} (+91 ${cleanMobile})`);
   } catch (e) {
     console.error('[MongoDB User Creation Error]', e);
   }
