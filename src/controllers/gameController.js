@@ -58,8 +58,27 @@ const placeBet = async (req, res) => {
 
       memoryBets.unshift(newBet);
       createdBets.push(newBet);
+
+      try {
+        Bet.create({
+          game_name: targetGame,
+          bet_type: bet_type || 'JODI',
+          number: num,
+          bet_amount: amount,
+          potential_payout: amount * 95,
+          win_amount: 0,
+          status: 'pending',
+          user: mobile || 'User',
+          mobile: mobile || ''
+        }).catch(e => console.error('[Bet DB Persist Error]:', e.message));
+      } catch (e) { }
     }
   }
+
+  try {
+    const { saveDiskStore } = require('../store');
+    saveDiskStore();
+  } catch (e) { }
 
   // Deduct stake from target user balance
   const userMobile = mobile || req.body.userPhone;

@@ -3,16 +3,17 @@ const mongoose = require('mongoose');
 const connectDB = async () => {
   try {
     const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 3000
+      serverSelectionTimeoutMS: 5000
     });
     console.log(`MongoDB Connected: ${conn.connection.host}`);
 
-    // Load all registered users from MongoDB Atlas
+    const { registeredUsers, memoryBets, saveDiskStore } = require('../store');
+
+    // 1. Load all registered users from MongoDB Atlas
     try {
       const User = require('../models/User');
       const dbUsers = await User.find({});
       if (dbUsers && dbUsers.length > 0) {
-        const { registeredUsers } = require('../store');
         dbUsers.forEach(dbU => {
           if (dbU.mobile) {
             const cleanMobile = dbU.mobile.replace(/[^0-9]/g, '').slice(-10);
@@ -31,8 +32,7 @@ const connectDB = async () => {
                 status: 'Active',
                 referral_code: dbU.referral_code || `REF${cleanMobile}`,
                 referred_by: dbU.referred_by || null,
-                createdAt: '12:00 AM',
-                createdDateKey: '2026-08-18'
+                createdAt: dbU.createdAt ? new Date(dbU.createdAt).toISOString() : new Date().toISOString()
               };
               registeredUsers.push(existing);
             } else {
@@ -48,9 +48,47 @@ const connectDB = async () => {
             }
           }
         });
-        console.log(`[MongoDB] Loaded ${dbUsers.length} users with referral codes from Cloud Database into memory.`);
+        console.log(`[MongoDB] Loaded ${dbUsers.length} users from Cloud Database into memory.`);
       }
-    } catch (e) { }
+    } catch (e) {
+      console.error('[MongoDB] User Hydration Error:', e.message);
+    }
+
+    // 2. Load all bets from MongoDB Atlas
+    try {
+      const Bet = require('../models/Bet');
+      const dbBets = await Bet.find({}).sort({ created_at: -1 });
+      if (dbBets && dbBets.length > 0) {
+        dbBets.forEach(dbB => {
+          const betId = dbB._id.toString();
+          const exists = memoryBets.find(b => b._id === betId);
+          if (!exists) {
+            memoryBets.push({
+              _id: betId,
+              game_name: dbB.game_name,
+              category: dbB.game_name,
+              bet_type: dbB.bet_type || 'Single Jodi',
+              gameType: dbB.bet_type || 'Single Jodi',
+              number: dbB.number,
+              bet_amount: dbB.bet_amount,
+              amount: dbB.bet_amount,
+              potential_payout: dbB.potential_payout || (dbB.bet_amount * 95),
+              win_amount: dbB.win_amount || 0,
+              status: dbB.status || 'pending',
+              user: dbB.user || dbB.mobile || 'User',
+              phone: dbB.mobile || '1111111131',
+              date: dbB.created_at ? new Date(dbB.created_at).toISOString() : new Date().toISOString(),
+              created_at: dbB.created_at ? new Date(dbB.created_at).toISOString() : new Date().toISOString()
+            });
+          }
+        });
+        console.log(`[MongoDB] Loaded ${dbBets.length} bets from Cloud Database into memory.`);
+      }
+    } catch (e) {
+      console.error('[MongoDB] Bet Hydration Error:', e.message);
+    }
+
+    saveDiskStore();
   } catch (error) {
     console.log(`MongoDB not connected (${error.message}). Running server with in-memory storage fallback.`);
   }
