@@ -10,21 +10,55 @@ const getStats = async (req, res) => {
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
-    const isToday = (dateVal) => {
+    const todayISOStr = now.toISOString().split('T')[0];
+    const todayDateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+    const todayAltStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    const isToday = (item) => {
+      if (!item) return false;
+      
+      let dateVal = item;
+      let mongoId = null;
+      if (typeof item === 'object' && item !== null) {
+        dateVal = item.createdAt || item.created_at || item.createdDateKey || item.date || item.timestamp;
+        mongoId = item._id || item.id;
+      }
+
+      // 1. Check MongoDB ObjectId timestamp
+      if (mongoId) {
+        try {
+          const mongoose = require('mongoose');
+          if (mongoose.Types.ObjectId.isValid(String(mongoId))) {
+            const idDate = new mongoose.Types.ObjectId(String(mongoId)).getTimestamp();
+            const idISO = idDate.toISOString().split('T')[0];
+            if (idISO === todayISOStr) return true;
+          }
+        } catch (e) {}
+      }
+
       if (!dateVal) return false;
+
+      // 2. String comparison
+      const str = String(dateVal);
+      if (str.includes(todayDateStr) || str.includes(todayISOStr) || str.includes(todayAltStr)) {
+        return true;
+      }
+
+      // 3. Time-only format like "09:30 PM" (created during current session today)
+      if ((str.includes('AM') || str.includes('PM')) && !str.includes('-') && !str.includes('/')) {
+        return true;
+      }
+
+      // 4. JS Date comparison
       try {
         const d = new Date(dateVal);
         if (!isNaN(d.getTime())) {
-          return d >= startOfToday && d <= endOfToday;
+          const dISO = d.toISOString().split('T')[0];
+          return dISO === todayISOStr || (d >= startOfToday && d <= endOfToday);
         }
-        const str = String(dateVal);
-        const todayDateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
-        const todayISOStr = now.toISOString().split('T')[0];
-        const todayAltStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-        return str.includes(todayDateStr) || str.includes(todayISOStr) || str.includes(todayAltStr);
-      } catch (e) {
-        return false;
-      }
+      } catch (e) {}
+
+      return false;
     };
 
     let usersList = [...registeredUsers];
@@ -60,21 +94,21 @@ const getStats = async (req, res) => {
 
     // 1. Users metrics
     const usersCount = usersList.length;
-    const dailyNewUsers = usersList.filter(u => isToday(u.createdAt || u.created_at || u.createdDateKey)).length;
+    const dailyNewUsers = usersList.filter(u => isToday(u)).length;
 
     // 2. Deposits metrics
     const approvedDeposits = depositsList.filter(d => !d.status || d.status === 'Approved' || d.status === 'success' || d.status === 'completed');
     const totalDeposite = approvedDeposits.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
-    const todayDeposite = approvedDeposits.filter(d => isToday(d.date || d.created_at || d.createdAt)).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+    const todayDeposite = approvedDeposits.filter(d => isToday(d)).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
 
     // 3. Betting metrics
     const totalBetting = betsList.reduce((sum, b) => sum + (parseFloat(b.amount || b.bet_amount) || 0), 0);
-    const todayBetting = betsList.filter(b => isToday(b.date || b.created_at || b.createdAt)).reduce((sum, b) => sum + (parseFloat(b.amount || b.bet_amount) || 0), 0);
+    const todayBetting = betsList.filter(b => isToday(b)).reduce((sum, b) => sum + (parseFloat(b.amount || b.bet_amount) || 0), 0);
 
     // 4. Winning metrics
     const winningBets = betsList.filter(b => b.status === 'won' || b.status === 'Won' || (parseFloat(b.win_amount) > 0));
     const totalWinnings = winningBets.reduce((sum, b) => sum + (parseFloat(b.win_amount || (b.amount * 95)) || 0), 0);
-    const todayWinnings = winningBets.filter(b => isToday(b.date || b.created_at || b.createdAt)).reduce((sum, b) => sum + (parseFloat(b.win_amount || (b.amount * 95)) || 0), 0);
+    const todayWinnings = winningBets.filter(b => isToday(b)).reduce((sum, b) => sum + (parseFloat(b.win_amount || (b.amount * 95)) || 0), 0);
 
     // 5. Wallet balance metrics
     const totalBalanceWallet = usersList.reduce((sum, u) => sum + (parseFloat(u.balance !== undefined ? u.balance : (u.wallet_balance || 0)) || 0), 0);
