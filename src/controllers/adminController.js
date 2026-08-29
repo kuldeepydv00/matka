@@ -1501,18 +1501,21 @@ const getPaymentMethods = async (req, res) => {
       const PaymentMethod = require('../models/PaymentMethod');
       const dbPMs = await PaymentMethod.find().sort({ updatedAt: -1 }).lean();
       if (dbPMs && dbPMs.length > 0) {
-        memoryPaymentMethods = dbPMs.map(p => ({
-          _id: String(p._id),
-          id: String(p._id),
-          name: p.name || 'PhonePe / GPay / Paytm UPI',
-          upiId: p.upi_id || p.upiId || '8930507940@ybl',
-          upi_id: p.upi_id || p.upiId || '8930507940@ybl',
-          merchant_name: p.merchant_name || 'Matka Official',
-          ordering: p.ordering || 1,
-          qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${p.upi_id || '8930507940@ybl'}&pn=${encodeURIComponent(p.merchant_name || 'Matka Official')}`,
-          updateDate: p.updateDate || (p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : 'Today'),
-          status: p.status || 'Active'
-        }));
+        memoryPaymentMethods = dbPMs.map(p => {
+          const actualUpi = p.upi_id || p.upiId || p.upi || '';
+          return {
+            _id: String(p._id),
+            id: String(p._id),
+            name: p.name || 'PhonePe / GPay / Paytm UPI',
+            upiId: actualUpi,
+            upi_id: actualUpi,
+            merchant_name: p.merchant_name || 'Matka Official',
+            ordering: p.ordering || 1,
+            qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${actualUpi}&pn=${encodeURIComponent(p.merchant_name || 'Matka Official')}`,
+            updateDate: p.updateDate || (p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : 'Today'),
+            status: p.status || 'Active'
+          };
+        });
       }
     }
   } catch (e) {
@@ -1524,7 +1527,7 @@ const getPaymentMethods = async (req, res) => {
 const savePaymentMethod = async (req, res) => {
   const { id, _id, name, upi_id, upiId, merchant_name, ordering, status, isEdit } = req.body;
   const rawId = isEdit ? (_id || id) : null;
-  const finalUpi = upi_id || upiId || '8930507940@ybl';
+  const finalUpi = upi_id || upiId || '';
   const finalName = name || 'PhonePe / GPay / Paytm UPI';
   const finalMerchant = merchant_name || 'Matka Official';
   const finalOrdering = parseInt(ordering) || (memoryPaymentMethods.length + 1);
@@ -1537,6 +1540,9 @@ const savePaymentMethod = async (req, res) => {
     existingIdx = memoryPaymentMethods.findIndex(p => 
       String(p._id) === String(rawId) || String(p.id) === String(rawId)
     );
+  }
+  if (isEdit && existingIdx < 0 && memoryPaymentMethods.length > 0) {
+    existingIdx = 0; // Replace default entry on edit
   }
 
   // Deactivate others if this one is Active
@@ -1572,6 +1578,9 @@ const savePaymentMethod = async (req, res) => {
       let dbPM = null;
       if (isEdit && rawId && mongoose.Types.ObjectId.isValid(rawId)) {
         try { dbPM = await PaymentMethod.findById(rawId); } catch(e) {}
+      }
+      if (isEdit && !dbPM) {
+        dbPM = await PaymentMethod.findOne();
       }
 
       if (dbPM) {
