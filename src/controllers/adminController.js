@@ -50,15 +50,18 @@ const getUsers = async (req, res) => {
       dbUsers.forEach(dbu => {
         const cleanMobile = (dbu.mobile || '').replace(/[^0-9]/g, '').slice(-10);
         if (cleanMobile) {
-          let memUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+          let memUser = registeredUsers.find(u => u.mobile && u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
           if (!memUser) {
             memUser = {
-              id: dbu._id,
+              id: dbu._id || `usr_${Date.now()}_${cleanMobile}`,
               name: dbu.name || dbu.username || `User ${cleanMobile.slice(-4)}`,
               mobile: cleanMobile,
               balance: dbu.wallet_balance || 0.00,
+              deposit_balance: dbu.deposit_balance || 0.00,
+              winning_balance: dbu.winning_balance || 0.00,
+              bonus_balance: dbu.bonus_balance !== undefined ? dbu.bonus_balance : 200.00,
               status: 'Active',
-              createdAt: dbu.createdAt ? new Date(dbu.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Today'
+              createdAt: dbu.createdAt ? new Date(dbu.createdAt).toISOString() : new Date().toISOString()
             };
             registeredUsers.push(memUser);
           } else {
@@ -69,6 +72,37 @@ const getUsers = async (req, res) => {
       });
     }
   } catch (e) { }
+
+  // Extract any users from memoryBets, memoryDeposits, memoryWithdrawals not yet in registeredUsers
+  const extractFromMemory = (list) => {
+    if (!Array.isArray(list)) return;
+    list.forEach(item => {
+      const rawUser = item.user || item.mobile || item.userPhone || '';
+      const cleanMobile = rawUser.replace(/[^0-9]/g, '').slice(-10);
+      if (cleanMobile && cleanMobile.length === 10) {
+        let exists = registeredUsers.find(u => u.mobile && u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+        if (!exists) {
+          let name = rawUser.includes('(') ? rawUser.split('(')[0].trim() : (rawUser.length < 10 ? rawUser : `User ${cleanMobile.slice(-4)}`);
+          if (!name || name === 'User') name = `User ${cleanMobile.slice(-4)}`;
+          registeredUsers.push({
+            id: `usr_${cleanMobile}`,
+            name: name,
+            mobile: cleanMobile,
+            balance: 0.00,
+            deposit_balance: 0.00,
+            winning_balance: 0.00,
+            bonus_balance: 200.00,
+            status: 'Active',
+            createdAt: item.created_at || new Date().toISOString()
+          });
+        }
+      }
+    });
+  };
+
+  extractFromMemory(memoryBets);
+  extractFromMemory(memoryDeposits);
+  extractFromMemory(memoryWithdrawals);
 
   res.json(registeredUsers);
 };
