@@ -1101,6 +1101,25 @@ const updateBannerConfig = async (req, res) => {
   res.json({ success: true, message: 'Banner configuration updated successfully', bannerConfig });
 };
 
+const getAppVersionConfig = async (req, res) => {
+  const { appVersionConfig } = require('../store');
+  res.json(appVersionConfig || {
+    latestVersionCode: 2,
+    latestVersionName: '1.0.2',
+    minSupportedVersion: 1,
+    apkUrl: 'https://matka-website.vercel.app/app-debug.apk',
+    updateMessage: '🚀 A new performance update is available!',
+    forceUpdate: false
+  });
+};
+
+const updateAppVersionConfig = async (req, res) => {
+  const { appVersionConfig, saveDiskStore } = require('../store');
+  if (req.body && appVersionConfig) Object.assign(appVersionConfig, req.body);
+  saveDiskStore();
+  res.json({ success: true, appVersionConfig });
+};
+
 // @desc    Get all placed bets for Admin Panel
 // @route   GET /api/admin/bets
 const getAdminBets = async (req, res) => {
