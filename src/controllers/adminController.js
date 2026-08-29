@@ -1531,6 +1531,19 @@ const savePaymentMethod = async (req, res) => {
   const finalStatus = status || 'Active';
   const todayStr = new Date().toLocaleDateString();
 
+  if (finalStatus === 'Active') {
+    memoryPaymentMethods.forEach(p => {
+      p.status = 'Inactive';
+    });
+    try {
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState === 1) {
+        const PaymentMethod = require('../models/PaymentMethod');
+        await PaymentMethod.updateMany({}, { $set: { status: 'Inactive' } });
+      }
+    } catch (e) {}
+  }
+
   const pmObj = {
     _id: targetId,
     id: targetId,
@@ -1578,6 +1591,33 @@ const savePaymentMethod = async (req, res) => {
   saveDiskStore();
   console.log(`[Payment Method Saved] ${finalName} (${finalUpi}) - Status: ${finalStatus}`);
   res.json({ success: true, message: 'Payment method saved successfully!', paymentMethod: pmObj, paymentMethods: memoryPaymentMethods });
+};
+
+const toggleActivePaymentMethod = async (req, res) => {
+  const { id } = req.params;
+  
+  memoryPaymentMethods.forEach(p => {
+    if (String(p._id) === String(id) || String(p.id) === String(id)) {
+      p.status = 'Active';
+    } else {
+      p.status = 'Inactive';
+    }
+  });
+
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const PaymentMethod = require('../models/PaymentMethod');
+      await PaymentMethod.updateMany({}, { $set: { status: 'Inactive' } });
+      await PaymentMethod.updateOne({ _id: id }, { $set: { status: 'Active' } });
+    }
+  } catch (e) {
+    console.error('[Toggle Active Payment Method Error]', e);
+  }
+
+  saveDiskStore();
+  console.log(`[Payment Method Toggled] #${id} is now ACTIVE. All other UPI IDs are INACTIVE.`);
+  res.json({ success: true, message: 'Active UPI ID updated successfully!', paymentMethods: memoryPaymentMethods });
 };
 
 const deletePaymentMethod = async (req, res) => {
@@ -1634,5 +1674,6 @@ module.exports = {
   getPackages,
   getPaymentMethods,
   savePaymentMethod,
-  deletePaymentMethod
+  deletePaymentMethod,
+  toggleActivePaymentMethod
 };
