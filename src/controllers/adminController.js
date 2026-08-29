@@ -5,57 +5,104 @@ const { chartRecords, formatDateKey } = require('../historicalChartStore');
 // @desc    Get dashboard stats including real-time user, bet, deposit, winning, and wallet metrics
 // @route   GET /api/admin/stats
 const getStats = async (req, res) => {
-  const now = new Date();
-  const todayStrKey = formatDateKey(now);
-  const todayDateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
-  const todayISOStr = now.toISOString().split('T')[0];
+  try {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
-  const isToday = (dateStr) => {
-    if (!dateStr) return false;
-    return dateStr.includes(todayDateStr) || dateStr.includes(todayISOStr) || dateStr.includes(todayStrKey);
-  };
+    const isToday = (dateVal) => {
+      if (!dateVal) return false;
+      try {
+        const d = new Date(dateVal);
+        if (!isNaN(d.getTime())) {
+          return d >= startOfToday && d <= endOfToday;
+        }
+        const str = String(dateVal);
+        const todayDateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+        const todayISOStr = now.toISOString().split('T')[0];
+        const todayAltStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        return str.includes(todayDateStr) || str.includes(todayISOStr) || str.includes(todayAltStr);
+      } catch (e) {
+        return false;
+      }
+    };
 
-  const usersCount = registeredUsers.length;
-  let dailyNewUsers = 0;
-  registeredUsers.forEach(user => {
-    if (isToday(user.createdAt || user.createdDateKey)) {
-      dailyNewUsers++;
+    let usersList = [...registeredUsers];
+    let depositsList = [...memoryDeposits];
+    let betsList = [...memoryBets];
+
+    // Merge/override from MongoDB Atlas if connected
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      try {
+        const User = require('../models/User');
+        const Bet = require('../models/Bet');
+        const Transaction = require('../models/Transaction');
+
+        const dbUsers = await User.find({}).lean();
+        if (dbUsers && dbUsers.length > 0) {
+          usersList = dbUsers;
+        }
+
+        const dbBets = await Bet.find({}).lean();
+        if (dbBets && dbBets.length > 0) {
+          betsList = dbBets;
+        }
+
+        const dbTxns = await Transaction.find({ type: 'deposit' }).lean();
+        if (dbTxns && dbTxns.length > 0) {
+          depositsList = dbTxns;
+        }
+      } catch (dbErr) {
+        console.error('[getStats DB Sync Error]', dbErr.message);
+      }
     }
-  });
-  if (dailyNewUsers === 0 && usersCount > 0) dailyNewUsers = 1;
 
-  const totalDeposite = memoryDeposits.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
-  const todayDeposite = memoryDeposits.filter(d => isToday(d.date || d.created_at)).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+    // 1. Users metrics
+    const usersCount = usersList.length;
+    const dailyNewUsers = usersList.filter(u => isToday(u.createdAt || u.created_at || u.createdDateKey)).length;
 
-  const totalBetting = memoryBets.reduce((sum, b) => sum + (parseFloat(b.amount || b.bet_amount) || 0), 0);
-  const todayBetting = memoryBets.filter(b => isToday(b.date || b.created_at)).reduce((sum, b) => sum + (parseFloat(b.amount || b.bet_amount) || 0), 0);
+    // 2. Deposits metrics
+    const approvedDeposits = depositsList.filter(d => !d.status || d.status === 'Approved' || d.status === 'success' || d.status === 'completed');
+    const totalDeposite = approvedDeposits.reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
+    const todayDeposite = approvedDeposits.filter(d => isToday(d.date || d.created_at || d.createdAt)).reduce((sum, d) => sum + (parseFloat(d.amount) || 0), 0);
 
-  const winningBets = memoryBets.filter(b => b.status === 'won' || b.status === 'Won' || (parseFloat(b.win_amount) > 0));
-  const totalWinnings = winningBets.reduce((sum, b) => sum + (parseFloat(b.win_amount || (b.amount * 95)) || 0), 0);
-  const todayWinnings = winningBets.filter(b => isToday(b.date || b.created_at)).reduce((sum, b) => sum + (parseFloat(b.win_amount || (b.amount * 95)) || 0), 0);
+    // 3. Betting metrics
+    const totalBetting = betsList.reduce((sum, b) => sum + (parseFloat(b.amount || b.bet_amount) || 0), 0);
+    const todayBetting = betsList.filter(b => isToday(b.date || b.created_at || b.createdAt)).reduce((sum, b) => sum + (parseFloat(b.amount || b.bet_amount) || 0), 0);
 
-  const totalBalanceWallet = registeredUsers.reduce((sum, u) => sum + (parseFloat(u.balance) || 0), 0);
-  const totalDepositWallet = registeredUsers.reduce((sum, u) => sum + (parseFloat(u.deposit_balance) || 0), 0);
-  const totalWinningWallet = registeredUsers.reduce((sum, u) => sum + (parseFloat(u.winning_balance) || 0), 0);
-  const totalBonusWallet = registeredUsers.reduce((sum, u) => sum + (parseFloat(u.bonus_balance !== undefined ? u.bonus_balance : 200) || 0), 0);
-  const totalCommissionWallet = (totalBetting * 0.04);
+    // 4. Winning metrics
+    const winningBets = betsList.filter(b => b.status === 'won' || b.status === 'Won' || (parseFloat(b.win_amount) > 0));
+    const totalWinnings = winningBets.reduce((sum, b) => sum + (parseFloat(b.win_amount || (b.amount * 95)) || 0), 0);
+    const todayWinnings = winningBets.filter(b => isToday(b.date || b.created_at || b.createdAt)).reduce((sum, b) => sum + (parseFloat(b.win_amount || (b.amount * 95)) || 0), 0);
 
-  res.json({
-    success: true,
-    users: usersCount,
-    dailyNewUsers,
-    totalDeposite,
-    todayDeposite,
-    totalWinnings,
-    todayWinnings,
-    totalBetting,
-    todayBetting,
-    totalBalanceWallet,
-    totalDepositWallet,
-    totalWinningWallet,
-    totalCommissionWallet,
-    totalBonusWallet
-  });
+    // 5. Wallet balance metrics
+    const totalBalanceWallet = usersList.reduce((sum, u) => sum + (parseFloat(u.balance !== undefined ? u.balance : (u.wallet_balance || 0)) || 0), 0);
+    const totalDepositWallet = usersList.reduce((sum, u) => sum + (parseFloat(u.deposit_balance) || 0), 0);
+    const totalWinningWallet = usersList.reduce((sum, u) => sum + (parseFloat(u.winning_balance) || 0), 0);
+    const totalBonusWallet = usersList.reduce((sum, u) => sum + (parseFloat(u.bonus_balance !== undefined ? u.bonus_balance : 200) || 0), 0);
+    const totalCommissionWallet = (totalBetting * 0.04);
+
+    return res.json({
+      success: true,
+      users: usersCount,
+      dailyNewUsers,
+      totalDeposite,
+      todayDeposite,
+      totalWinnings,
+      todayWinnings,
+      totalBetting,
+      todayBetting,
+      totalBalanceWallet,
+      totalDepositWallet,
+      totalWinningWallet,
+      totalCommissionWallet,
+      totalBonusWallet
+    });
+  } catch (err) {
+    console.error('[getStats Error]', err.message);
+    res.status(500).json({ success: false, message: 'Server error computing dashboard stats' });
+  }
 };
 
 // @desc    Get all registered users for Admin Panel
