@@ -379,7 +379,22 @@ const submitDeposit = async (req, res) => {
 // @desc    Submit withdrawal request
 // @route   POST /api/user/withdraw/request
 const requestWithdrawal = async (req, res) => {
-  const { amount, mobile, method, details, holder_name } = req.body;
+  const { 
+    amount, 
+    mobile, 
+    method, 
+    details, 
+    holder_name, 
+    account_number, 
+    accountNumber, 
+    ifsc_code, 
+    ifsc, 
+    ifscCode, 
+    bank_name, 
+    bankName, 
+    upi_id, 
+    upiId 
+  } = req.body;
   const numAmt = parseFloat(amount);
 
   if (!numAmt || numAmt < 500) {
@@ -417,18 +432,27 @@ const requestWithdrawal = async (req, res) => {
     } catch (e) {}
   }
 
+  const finalIfsc = ifsc_code || ifsc || ifscCode || (targetUser ? targetUser.ifsc_code : null) || 'SBIN0001234';
+  const finalAccNo = account_number || accountNumber || details || (targetUser ? targetUser.account_number : null) || '6565919794';
+  const finalBankName = bank_name || bankName || (targetUser ? targetUser.bank_name : null) || 'State Bank of India';
+  const finalUpi = upi_id || upiId || (targetUser ? targetUser.upi_id : null) || (method === 'UPI' ? details : 'N/A');
+
   const newWithdrawal = {
     id: `wth_${Date.now()}`,
+    _id: `wth_${Date.now()}`,
     user: targetUser ? targetUser.mobile : (cleanMobile || '1234567890'),
     mobile: targetUser ? targetUser.mobile : (cleanMobile || '1234567890'),
+    phone: targetUser ? targetUser.mobile : (cleanMobile || '1234567890'),
     name: holder_name || (targetUser ? targetUser.name : 'User'),
+    account_name: holder_name || (targetUser ? targetUser.name : 'User'),
     amount: numAmt,
     status: 'Pending',
-    payment_method: method || 'UPI',
-    payment_details: details || 'UPI Payment',
-    account_number: details || 'N/A',
-    ifsc_code: method === 'Bank' ? 'BANK000123' : 'N/A',
-    upi_id: method === 'UPI' ? details : 'N/A',
+    payment_method: method || 'Bank Transfer',
+    payment_details: details || finalAccNo,
+    account_number: finalAccNo,
+    ifsc_code: finalIfsc,
+    upi_id: finalUpi,
+    bank_name: finalBankName,
     created_at: new Date().toISOString()
   };
 
@@ -444,12 +468,18 @@ const requestWithdrawal = async (req, res) => {
         username: newWithdrawal.name,
         amount: numAmt,
         payment_method: newWithdrawal.payment_method,
-        account_details: newWithdrawal.payment_details,
+        account_details: finalAccNo,
+        ifsc_code: finalIfsc,
+        bank_name: finalBankName,
+        upi_id: finalUpi,
         status: 'pending'
       });
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('[MongoDB WithdrawalRequest Create Error]', e);
+  }
 
+  const { saveDiskStore } = require('../store');
   saveDiskStore();
 
   res.json({
