@@ -60,6 +60,12 @@ app.get('/api/app/version', (req, res) => {
 });
 
 // Routes
+const { getPaymentMethods, savePaymentMethod, deletePaymentMethod, toggleActivePaymentMethod } = require('./controllers/adminController');
+app.get('/api/payment-methods', getPaymentMethods);
+app.post('/api/payment-methods', savePaymentMethod);
+app.delete('/api/payment-methods/:id', deletePaymentMethod);
+app.post('/api/payment-methods/:id/toggle', toggleActivePaymentMethod);
+
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/user', require('./routes/userRoutes'));
 app.use('/api/game', require('./routes/gameRoutes'));
