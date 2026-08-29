@@ -1499,12 +1499,12 @@ const getPaymentMethods = async (req, res) => {
     const mongoose = require('mongoose');
     if (mongoose.connection.readyState === 1) {
       const PaymentMethod = require('../models/PaymentMethod');
-      const dbPMs = await PaymentMethod.find().sort({ ordering: 1 }).lean();
+      const dbPMs = await PaymentMethod.find().sort({ updatedAt: -1 }).lean();
       if (dbPMs && dbPMs.length > 0) {
         memoryPaymentMethods = dbPMs.map(p => ({
           _id: String(p._id),
           id: String(p._id),
-          name: p.name || 'UPI Payment',
+          name: p.name || 'PhonePe / GPay / Paytm UPI',
           upiId: p.upi_id || p.upiId || '8930507940@ybl',
           upi_id: p.upi_id || p.upiId || '8930507940@ybl',
           merchant_name: p.merchant_name || 'Matka Official',
@@ -1531,19 +1531,6 @@ const savePaymentMethod = async (req, res) => {
   const finalStatus = status || 'Active';
   const todayStr = new Date().toLocaleDateString();
 
-  if (finalStatus === 'Active') {
-    memoryPaymentMethods.forEach(p => {
-      p.status = 'Inactive';
-    });
-    try {
-      const mongoose = require('mongoose');
-      if (mongoose.connection.readyState === 1) {
-        const PaymentMethod = require('../models/PaymentMethod');
-        await PaymentMethod.updateMany({}, { $set: { status: 'Inactive' } });
-      }
-    } catch (e) {}
-  }
-
   const pmObj = {
     _id: targetId,
     id: targetId,
@@ -1556,6 +1543,14 @@ const savePaymentMethod = async (req, res) => {
     updateDate: todayStr,
     status: finalStatus
   };
+
+  if (finalStatus === 'Active') {
+    memoryPaymentMethods.forEach(p => {
+      if (String(p._id) !== String(targetId) && String(p.id) !== String(targetId)) {
+        p.status = 'Inactive';
+      }
+    });
+  }
 
   let existingIdx = memoryPaymentMethods.findIndex(p => 
     String(p._id) === String(targetId) || 
@@ -1579,7 +1574,15 @@ const savePaymentMethod = async (req, res) => {
     const mongoose = require('mongoose');
     if (mongoose.connection.readyState === 1) {
       const PaymentMethod = require('../models/PaymentMethod');
-      let dbPM = await PaymentMethod.findOne({ _id: targetId });
+
+      if (finalStatus === 'Active') {
+        await PaymentMethod.updateMany({}, { $set: { status: 'Inactive' } });
+      }
+
+      let dbPM = null;
+      if (targetId && !targetId.startsWith('pm_')) {
+        try { dbPM = await PaymentMethod.findById(targetId); } catch(e) {}
+      }
       if (!dbPM) dbPM = await PaymentMethod.findOne({ status: 'Active' });
       if (!dbPM) dbPM = await PaymentMethod.findOne();
 
