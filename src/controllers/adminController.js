@@ -1525,7 +1525,7 @@ const savePaymentMethod = async (req, res) => {
   const { id, _id, name, upi_id, upiId, merchant_name, ordering, status } = req.body;
   const targetId = _id || id || `pm_${Date.now()}`;
   const finalUpi = upi_id || upiId || '8930507940@ybl';
-  const finalName = name || 'UPI Payment';
+  const finalName = name || 'PhonePe / GPay / Paytm UPI';
   const finalMerchant = merchant_name || 'Matka Official';
   const finalOrdering = parseInt(ordering) || 1;
   const finalStatus = status || 'Active';
@@ -1557,7 +1557,17 @@ const savePaymentMethod = async (req, res) => {
     status: finalStatus
   };
 
-  const existingIdx = memoryPaymentMethods.findIndex(p => String(p._id) === String(targetId) || String(p.id) === String(targetId));
+  let existingIdx = memoryPaymentMethods.findIndex(p => 
+    String(p._id) === String(targetId) || 
+    String(p.id) === String(targetId) ||
+    String(p._id) === String(_id) ||
+    String(p.id) === String(id)
+  );
+
+  if (existingIdx < 0 && memoryPaymentMethods.length > 0) {
+    existingIdx = 0; // Replace default first record
+  }
+
   if (existingIdx >= 0) {
     memoryPaymentMethods[existingIdx] = pmObj;
   } else {
@@ -1569,20 +1579,32 @@ const savePaymentMethod = async (req, res) => {
     const mongoose = require('mongoose');
     if (mongoose.connection.readyState === 1) {
       const PaymentMethod = require('../models/PaymentMethod');
-      await PaymentMethod.findOneAndUpdate(
-        { _id: targetId },
-        { 
-          $set: { 
-            name: finalName, 
-            upi_id: finalUpi, 
-            merchant_name: finalMerchant, 
-            ordering: finalOrdering, 
-            status: finalStatus,
-            updateDate: todayStr 
-          } 
-        },
-        { upsert: true, new: true }
-      );
+      let dbPM = await PaymentMethod.findOne({ _id: targetId });
+      if (!dbPM) dbPM = await PaymentMethod.findOne({ status: 'Active' });
+      if (!dbPM) dbPM = await PaymentMethod.findOne();
+
+      if (dbPM) {
+        dbPM.name = finalName;
+        dbPM.upi_id = finalUpi;
+        dbPM.merchant_name = finalMerchant;
+        dbPM.ordering = finalOrdering;
+        dbPM.status = finalStatus;
+        dbPM.updateDate = todayStr;
+        await dbPM.save();
+        pmObj._id = String(dbPM._id);
+        pmObj.id = String(dbPM._id);
+      } else {
+        const created = await PaymentMethod.create({
+          name: finalName,
+          upi_id: finalUpi,
+          merchant_name: finalMerchant,
+          ordering: finalOrdering,
+          status: finalStatus,
+          updateDate: todayStr
+        });
+        pmObj._id = String(created._id);
+        pmObj.id = String(created._id);
+      }
     }
   } catch (e) {
     console.error('[Save Payment Method Error]', e);
