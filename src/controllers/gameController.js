@@ -223,11 +223,6 @@ const getMyBets = async (req, res) => {
     } catch (e) { }
   }
 
-  // Fallback: If userBets is empty, return memoryBets so placed bets are never lost
-  if (!userBets || userBets.length === 0) {
-    return res.json(memoryBets);
-  }
-
   return res.json(userBets);
 };
 
