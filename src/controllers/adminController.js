@@ -1523,17 +1523,32 @@ const getPaymentMethods = async (req, res) => {
 
 const savePaymentMethod = async (req, res) => {
   const { id, _id, name, upi_id, upiId, merchant_name, ordering, status } = req.body;
-  const targetId = _id || id || `pm_${Date.now()}`;
+  const rawId = _id || id;
   const finalUpi = upi_id || upiId || '8930507940@ybl';
   const finalName = name || 'PhonePe / GPay / Paytm UPI';
   const finalMerchant = merchant_name || 'Matka Official';
-  const finalOrdering = parseInt(ordering) || 1;
+  const finalOrdering = parseInt(ordering) || (memoryPaymentMethods.length + 1);
   const finalStatus = status || 'Active';
   const todayStr = new Date().toLocaleDateString();
 
-  const pmObj = {
-    _id: targetId,
-    id: targetId,
+  // Find if existing ID exists in memory store
+  let existingIdx = -1;
+  if (rawId && rawId !== 'new') {
+    existingIdx = memoryPaymentMethods.findIndex(p => 
+      String(p._id) === String(rawId) || String(p.id) === String(rawId)
+    );
+  }
+
+  // Deactivate others if this one is Active
+  if (finalStatus === 'Active') {
+    memoryPaymentMethods.forEach(p => {
+      p.status = 'Inactive';
+    });
+  }
+
+  let pmObj = {
+    _id: rawId || `pm_${Date.now()}`,
+    id: rawId || `pm_${Date.now()}`,
     name: finalName,
     upiId: finalUpi,
     upi_id: finalUpi,
@@ -1555,13 +1570,12 @@ const savePaymentMethod = async (req, res) => {
       }
 
       let dbPM = null;
-      if (targetId && !targetId.startsWith('pm_')) {
-        try { dbPM = await PaymentMethod.findById(targetId); } catch(e) {}
+      if (rawId && mongoose.Types.ObjectId.isValid(rawId)) {
+        try { dbPM = await PaymentMethod.findById(rawId); } catch(e) {}
       }
-      if (!dbPM) dbPM = await PaymentMethod.findOne({ status: 'Active' });
-      if (!dbPM) dbPM = await PaymentMethod.findOne();
 
       if (dbPM) {
+        // EDIT EXISTING DOCUMENT
         dbPM.name = finalName;
         dbPM.upi_id = finalUpi;
         dbPM.merchant_name = finalMerchant;
@@ -1572,6 +1586,7 @@ const savePaymentMethod = async (req, res) => {
         pmObj._id = String(dbPM._id);
         pmObj.id = String(dbPM._id);
       } else {
+        // CREATE NEW DOCUMENT
         const created = await PaymentMethod.create({
           name: finalName,
           upi_id: finalUpi,
@@ -1588,24 +1603,7 @@ const savePaymentMethod = async (req, res) => {
     console.error('[Save Payment Method Error]', e);
   }
 
-  // Always update memory store with the final object
-  if (finalStatus === 'Active') {
-    memoryPaymentMethods.forEach(p => {
-      p.status = 'Inactive';
-    });
-  }
-
-  let existingIdx = memoryPaymentMethods.findIndex(p => 
-    String(p._id) === String(targetId) || 
-    String(p.id) === String(targetId) ||
-    String(p._id) === String(pmObj._id) ||
-    String(p.id) === String(pmObj.id)
-  );
-
-  if (existingIdx < 0 && memoryPaymentMethods.length > 0) {
-    existingIdx = 0; // Overwrite default row
-  }
-
+  // Update memory store: EDIT or ADD
   if (existingIdx >= 0) {
     memoryPaymentMethods[existingIdx] = pmObj;
   } else {
@@ -1613,7 +1611,7 @@ const savePaymentMethod = async (req, res) => {
   }
 
   saveDiskStore();
-  console.log(`[Payment Method Saved] ${finalName} (${finalUpi}) - Status: ${finalStatus}`);
+  console.log(`[Payment Method Saved] ${finalName} (${finalUpi}) - Status: ${finalStatus} (IsEdit: ${existingIdx >= 0})`);
   res.json({ success: true, message: 'Payment method saved successfully!', paymentMethod: pmObj, paymentMethods: memoryPaymentMethods });
 };
 
