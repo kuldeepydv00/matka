@@ -652,16 +652,20 @@ const approveDeposit = async (req, res) => {
   const totalCredit = dep.amount + depositBonus;
 
   let updatedNewBalance = 0;
+  let oldBalVal = 0;
   if (userObj) {
-    userObj.balance = (userObj.balance || 0) + totalCredit;
+    oldBalVal = userObj.balance || 0;
+    userObj.deposit_balance = parseFloat(((userObj.deposit_balance || 0) + totalCredit).toFixed(2));
+    userObj.balance = parseFloat(((userObj.deposit_balance || 0) + (userObj.winning_balance || 0) + (userObj.commission_balance || 0)).toFixed(2));
     updatedNewBalance = userObj.balance;
   }
 
-  // Update MongoDB Atlas DepositRequest and User wallet_balance live!
+  // Update MongoDB Atlas DepositRequest, Transaction and User wallet_balance live!
   try {
     if (mongoose.connection.readyState === 1) {
       const DepositRequest = require('../models/DepositRequest');
       const User = require('../models/User');
+      const Transaction = require('../models/Transaction');
 
       await DepositRequest.updateOne(
         { _id: dep._id },
@@ -669,7 +673,7 @@ const approveDeposit = async (req, res) => {
       );
 
       if (cleanMobile) {
-        const updateOps = { $inc: { wallet_balance: totalCredit } };
+        const updateOps = { $inc: { deposit_balance: totalCredit, wallet_balance: totalCredit } };
         if (depositBonus > 0) {
           updateOps.$set = { first_deposit_bonus_claimed: true };
         }
@@ -680,14 +684,43 @@ const approveDeposit = async (req, res) => {
         );
         if (updatedUser) {
           updatedNewBalance = updatedUser.wallet_balance;
-          if (userObj) userObj.balance = updatedUser.wallet_balance;
+          if (userObj) {
+            userObj.balance = updatedUser.wallet_balance;
+            userObj.deposit_balance = updatedUser.deposit_balance || userObj.deposit_balance;
+          }
         }
+
+        // Write to Transaction collection in MongoDB Atlas
+        await Transaction.create({
+          user_id: cleanMobile,
+          username: userObj ? userObj.name : dep.user,
+          type: 'deposit',
+          amount: dep.amount,
+          status: 'success',
+          reference_id: dep.utr || dep._id,
+          description: `Deposit Approved (+₹${dep.amount})`
+        }).catch(e => {});
       }
       console.log(`[MongoDB Deposit Sync] Credited ₹${dep.amount}${depositBonus > 0 ? ` (+₹${depositBonus} Bonus)` : ''} to user (+91 ${cleanMobile}). New balance: ₹${updatedNewBalance}`);
     }
   } catch (e) {
     console.error('[MongoDB Approve Deposit Error]', e);
   }
+
+  // Log to Game Ledger
+  try {
+    const { logLedgerTransaction } = require('../store');
+    logLedgerTransaction({
+      user: userObj ? userObj.name : dep.user,
+      email: `${cleanMobile}@gmail.com`,
+      phone: cleanMobile,
+      amount: `+${dep.amount.toFixed(2)}`,
+      transactType: 'Deposit Approved',
+      oldBal: { wallet: oldBalVal.toFixed(2), deposit: '0.00', winning: '0.00', commission: '0.00', bonus: '200.00', referral: '0.00' },
+      newBal: { wallet: updatedNewBalance.toFixed(2), deposit: (userObj ? userObj.deposit_balance : 0).toFixed(2), winning: '0.00', commission: '0.00', bonus: '200.00', referral: '0.00' },
+      gameType: '-'
+    });
+  } catch (e) {}
 
   saveDiskStore();
   res.json({

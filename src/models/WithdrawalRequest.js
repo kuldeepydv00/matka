@@ -1,19 +1,21 @@
 const mongoose = require('mongoose');
 
 const withdrawalRequestSchema = new mongoose.Schema({
-  user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  user_id: { type: String },
+  username: { type: String },
+  mobile: { type: String },
   amount: { type: Number, required: true },
-  bank_details: {
-    account_number: { type: String, required: true },
-    ifsc: { type: String, required: true },
-    beneficiary_name: { type: String, required: true }
-  },
-  status: { type: String, enum: ['pending', 'approved', 'rejected', 'processed'], default: 'pending' },
-  admin_remarks: { type: String },
-  processed_at: { type: Date }
+  payment_method: { type: String, default: 'Bank Transfer' },
+  account_number: { type: String },
+  ifsc_code: { type: String },
+  bank_name: { type: String },
+  upi_id: { type: String },
+  status: { type: String, enum: ['pending', 'approved', 'rejected', 'Pending', 'Approved', 'Rejected'], default: 'pending' },
+  admin_remarks: { type: String }
 }, {
-  timestamps: { createdAt: 'requested_at', updatedAt: 'updated_at' }
+  strict: false,
+  timestamps: true
 });
 
-const WithdrawalRequest = mongoose.model('WithdrawalRequest', withdrawalRequestSchema);
+const WithdrawalRequest = mongoose.models.WithdrawalRequest || mongoose.model('WithdrawalRequest', withdrawalRequestSchema);
 module.exports = WithdrawalRequest;
