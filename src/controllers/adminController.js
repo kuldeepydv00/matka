@@ -1084,16 +1084,66 @@ const getAdminWinnings = async (req, res) => {
 };
 
 const getGameLedger = async (req, res) => {
-  res.json(memoryBets.map((b, i) => ({
-    id: b.id || `led_${i+1}`,
-    user: b.user || 'Player',
-    amount: b.bet_amount || 0,
-    date: b.created_at || 'Today',
-    type: 'BET_DEBIT',
-    oldBal: 1000,
-    newBal: 1000 - (b.bet_amount || 0),
-    gameType: b.bet_type || 'JODI'
-  })));
+  purgeOldLedger();
+
+  if (memoryGameLedger.length === 0) {
+    memoryBets.forEach(b => {
+      const uName = b.user || 'NasibAnsari';
+      memoryGameLedger.push({
+        id: `ldg_bet_${b._id || Date.now()}`,
+        user: uName,
+        email: `${uName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+        phone: b.mobile || '9007724336',
+        amount: `-${b.bet_amount || b.amount || 10}.00`,
+        date: b.date || b.created_at || new Date().toISOString().replace('T', ' ').slice(0, 19),
+        transactType: 'Bid Place',
+        oldBal: { wallet: '500.00', deposit: '500.00', winning: '0.00', commission: '0.00', bonus: '200.00', referral: '0.00' },
+        newBal: { wallet: `${500 - (b.bet_amount || b.amount || 10)}.00`, deposit: `${500 - (b.bet_amount || b.amount || 10)}.00`, winning: '0.00', commission: '0.00', bonus: '200.00', referral: '0.00' },
+        gameType: b.bet_type || b.gameType || 'Single Jodi'
+      });
+    });
+
+    memoryGameLedger.push(
+      {
+        id: 'ldg_comm_1',
+        user: 'NasibAnsari',
+        email: 'na0193354@gmail.com',
+        phone: '9007724336',
+        amount: '+0.25',
+        date: '2026-08-29 11:51:10',
+        transactType: 'Commission',
+        oldBal: { wallet: '0.00', deposit: '0.00', winning: '0.00', commission: '8.60', bonus: '0.00', referral: '99.10' },
+        newBal: { wallet: '0.00', deposit: '0.00', winning: '0.00', commission: '8.85', bonus: '0.00', referral: '99.10' },
+        gameType: '-'
+      },
+      {
+        id: 'ldg_comm_2',
+        user: 'NasibAnsari',
+        email: 'na0193354@gmail.com',
+        phone: '9007724336',
+        amount: '+0.75',
+        date: '2026-08-29 11:50:55',
+        transactType: 'Commission',
+        oldBal: { wallet: '0.00', deposit: '0.00', winning: '0.00', commission: '7.85', bonus: '0.00', referral: '99.10' },
+        newBal: { wallet: '0.00', deposit: '0.00', winning: '0.00', commission: '8.60', bonus: '0.00', referral: '99.10' },
+        gameType: '-'
+      },
+      {
+        id: 'ldg_comm_3',
+        user: 'NasibAnsari',
+        email: 'na0193354@gmail.com',
+        phone: '9007724336',
+        amount: '+0.5',
+        date: '2026-08-29 11:50:36',
+        transactType: 'Commission',
+        oldBal: { wallet: '0.00', deposit: '0.00', winning: '0.00', commission: '7.35', bonus: '0.00', referral: '99.10' },
+        newBal: { wallet: '0.00', deposit: '0.00', winning: '0.00', commission: '7.85', bonus: '0.00', referral: '99.10' },
+        gameType: '-'
+      }
+    );
+  }
+
+  res.json(memoryGameLedger);
 };
 
 const getCommissionLogs = async (req, res) => {

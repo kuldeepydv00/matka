@@ -15,7 +15,51 @@ let userWalletStore = {
 let memoryDeposits = [];
 let memoryWithdrawals = [];
 let memoryBets = [];
+let memoryGameLedger = [];
 let declaredResultsMap = {};
+
+const FORTY_DAYS_MS = 40 * 24 * 60 * 60 * 1000;
+
+function purgeOldLedger() {
+  const cutoff = Date.now() - FORTY_DAYS_MS;
+  memoryGameLedger = memoryGameLedger.filter(item => {
+    const itemTime = item.date ? new Date(item.date).getTime() : Date.now();
+    return !isNaN(itemTime) && itemTime >= cutoff;
+  });
+}
+
+function logLedgerTransaction(data) {
+  purgeOldLedger();
+  const entry = {
+    id: 'ldg_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+    user: data.user || 'NasibAnsari',
+    email: data.email || 'na0193354@gmail.com',
+    phone: data.phone || '9007724336',
+    amount: data.amount !== undefined ? (typeof data.amount === 'number' ? (data.amount >= 0 ? `+${data.amount}` : `${data.amount}`) : data.amount) : '+0.5',
+    date: data.date || new Date().toISOString().replace('T', ' ').slice(0, 19),
+    transactType: data.transactType || 'Commission',
+    oldBal: data.oldBal || {
+      wallet: '0.00',
+      deposit: '0.00',
+      winning: '0.00',
+      commission: '7.85',
+      bonus: '0.00',
+      referral: '99.10'
+    },
+    newBal: data.newBal || {
+      wallet: '0.00',
+      deposit: '0.00',
+      winning: '0.00',
+      commission: '8.60',
+      bonus: '0.00',
+      referral: '99.10'
+    },
+    gameType: data.gameType || '-'
+  };
+
+  memoryGameLedger.unshift(entry);
+  return entry;
+}
 
 let bannerConfig = {
   enabled: true,
@@ -162,9 +206,12 @@ module.exports = {
   memoryDeposits,
   memoryWithdrawals,
   memoryBets,
+  memoryGameLedger,
   declaredResultsMap,
   gameSchedulesStore,
   bannerConfig,
   referralConfig,
-  saveDiskStore
+  saveDiskStore,
+  logLedgerTransaction,
+  purgeOldLedger
 };
