@@ -504,33 +504,66 @@ const getWithdrawals = async (req, res) => {
     const mongoose = require('mongoose');
     if (mongoose.connection.readyState === 1) {
       const WithdrawalRequest = require('../models/WithdrawalRequest');
+      const User = require('../models/User');
       const dbWths = await WithdrawalRequest.find().sort({ createdAt: -1 }).lean();
+      const allUsers = await User.find({}).lean();
+
       if (dbWths && dbWths.length > 0) {
         dbWths.forEach(w => {
-          const exists = memoryWithdrawals.some(m => 
+          const rawMobile = (w.mobile || w.phone || w.user_id || w.username || '').replace(/[^0-9]/g, '');
+          const cleanMobile = rawMobile.length >= 10 ? rawMobile.slice(-10) : '';
+          const uMatch = allUsers.find(u => u.mobile === cleanMobile || (u.phone && u.phone.includes(cleanMobile))) ||
+                         registeredUsers.find(u => u.mobile === cleanMobile);
+
+          const existsIndex = memoryWithdrawals.findIndex(m => 
             (m.id && String(m.id) === String(w._id)) || 
             (m._id && String(m._id) === String(w._id))
           );
-          if (!exists) {
-            memoryWithdrawals.unshift({
-              id: w._id,
-              _id: w._id,
-              user: w.username || 'User',
-              mobile: w.user_id || 'N/A',
-              name: w.username || 'User',
-              amount: w.amount,
-              status: w.status ? w.status.toLowerCase() : 'pending',
-              payment_method: w.payment_method || 'UPI',
-              payment_details: w.account_details || 'UPI Payment',
-              account_number: w.account_details || 'N/A',
-              ifsc_code: 'N/A',
-              upi_id: w.payment_method === 'UPI' ? w.account_details : 'N/A',
-              created_at: w.createdAt ? new Date(w.createdAt).toISOString() : new Date().toISOString()
-            });
+
+          const wObj = {
+            id: String(w._id),
+            _id: String(w._id),
+            user: w.username || w.user_name || w.name || (uMatch ? uMatch.name : 'User'),
+            mobile: cleanMobile || (uMatch ? uMatch.mobile : 'N/A'),
+            phone: cleanMobile || (uMatch ? uMatch.mobile : 'N/A'),
+            name: w.username || w.name || (uMatch ? uMatch.name : 'User'),
+            amount: parseFloat(w.amount) || 0,
+            status: w.status ? (w.status.charAt(0).toUpperCase() + w.status.slice(1).toLowerCase()) : 'Pending',
+            payment_method: w.payment_method || w.method || 'Bank Transfer',
+            payment_details: w.payment_details || w.account_details || w.upi_id || 'N/A',
+            account_number: w.account_number || w.accountNumber || (uMatch ? uMatch.account_number : null) || w.account_details || 'N/A',
+            ifsc_code: w.ifsc_code || w.ifscCode || w.ifsc || (uMatch ? uMatch.ifsc_code : null) || 'N/A',
+            upi_id: w.upi_id || w.upiId || (uMatch ? uMatch.upi_id : null) || 'N/A',
+            bank_name: w.bank_name || w.bankName || (uMatch ? uMatch.bank_name : null) || 'N/A',
+            account_name: w.account_name || w.accountName || w.holder_name || (uMatch ? uMatch.name : null) || 'N/A',
+            created_at: w.createdAt ? new Date(w.createdAt).toISOString() : new Date().toISOString()
+          };
+
+          if (existsIndex >= 0) {
+            memoryWithdrawals[existsIndex] = { ...memoryWithdrawals[existsIndex], ...wObj };
+          } else {
+            memoryWithdrawals.unshift(wObj);
           }
         });
       }
     }
+
+    // Also enrich any remaining in-memory withdrawals with user details
+    memoryWithdrawals.forEach(w => {
+      const rawMobile = (w.mobile || w.phone || w.user || '').replace(/[^0-9]/g, '');
+      const cleanMobile = rawMobile.length >= 10 ? rawMobile.slice(-10) : '';
+      const uMatch = registeredUsers.find(u => u.mobile === cleanMobile || (u.phone && u.phone.includes(cleanMobile)));
+
+      if (uMatch) {
+        if (!w.mobile || w.mobile === 'N/A') w.mobile = uMatch.mobile;
+        if (!w.phone || w.phone === 'N/A') w.phone = uMatch.mobile;
+        if (!w.bank_name || w.bank_name === 'N/A') w.bank_name = uMatch.bank_name || 'N/A';
+        if (!w.account_number || w.account_number === 'N/A') w.account_number = uMatch.account_number || 'N/A';
+        if (!w.ifsc_code || w.ifsc_code === 'N/A') w.ifsc_code = uMatch.ifsc_code || 'N/A';
+        if (!w.upi_id || w.upi_id === 'N/A') w.upi_id = uMatch.upi_id || 'N/A';
+      }
+    });
+
   } catch (e) {
     console.error('[Admin Withdrawals Error]', e);
   }
@@ -704,48 +737,106 @@ const createWithdrawalRequest = async (req, res) => {
 // @desc    Approve withdrawal request
 const approveWithdrawal = async (req, res) => {
   const { id } = req.params;
-  let wth = memoryWithdrawals.find(w => w._id === id || w.id === id);
+  let wth = memoryWithdrawals.find(w => String(w._id) === String(id) || String(w.id) === String(id));
+
+  const mongoose = require('mongoose');
+
+  if (!wth && mongoose.connection.readyState === 1) {
+    try {
+      const WithdrawalRequest = require('../models/WithdrawalRequest');
+      const dbWth = await WithdrawalRequest.findById(id);
+      if (dbWth) {
+        wth = {
+          _id: String(dbWth._id),
+          id: String(dbWth._id),
+          user: dbWth.username || 'User',
+          amount: dbWth.amount,
+          status: 'Approved'
+        };
+        memoryWithdrawals.unshift(wth);
+      }
+    } catch (e) {}
+  }
 
   if (!wth) {
     return res.status(404).json({ success: false, message: 'Withdrawal request not found' });
   }
 
   wth.status = 'Approved';
+
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const WithdrawalRequest = require('../models/WithdrawalRequest');
+      await WithdrawalRequest.updateOne({ _id: wth._id }, { $set: { status: 'approved' } });
+    }
+  } catch (e) {}
+
   saveDiskStore();
+  console.log(`[Admin Withdrawal] Approved request #${wth.id} for ${wth.user}`);
   res.json({ success: true, message: 'Withdrawal approved successfully', withdrawal: wth });
 };
 
 // @desc    Reject withdrawal request & refund amount to user profile
 const rejectWithdrawal = async (req, res) => {
   const { id } = req.params;
-  let wth = memoryWithdrawals.find(w => w._id === id || w.id === id);
+  let wth = memoryWithdrawals.find(w => String(w._id) === String(id) || String(w.id) === String(id));
+
+  const mongoose = require('mongoose');
+
+  if (!wth && mongoose.connection.readyState === 1) {
+    try {
+      const WithdrawalRequest = require('../models/WithdrawalRequest');
+      const dbWth = await WithdrawalRequest.findById(id);
+      if (dbWth) {
+        wth = {
+          _id: String(dbWth._id),
+          id: String(dbWth._id),
+          user: dbWth.username || 'User',
+          amount: dbWth.amount,
+          status: 'Pending'
+        };
+        memoryWithdrawals.unshift(wth);
+      }
+    } catch (e) {}
+  }
 
   if (!wth) {
     return res.status(404).json({ success: false, message: 'Withdrawal request not found' });
   }
 
-  if (wth.status !== 'Rejected') {
-    wth.status = 'Rejected';
+  wth.status = 'Rejected';
 
-    // Refund the withdrawn amount back to the user's wallet!
-    let userObj = registeredUsers.find(u => wth.user && wth.user.includes(u.mobile));
-    if (!userObj && registeredUsers.length > 0) {
-      userObj = registeredUsers[0];
-    }
+  // Refund the withdrawn amount back to the user's wallet!
+  const rawMobile = (wth.mobile || wth.phone || wth.user || '').replace(/[^0-9]/g, '');
+  const cleanMobile = rawMobile.length >= 10 ? rawMobile.slice(-10) : '';
 
-    if (userObj) {
-      userObj.balance = (userObj.balance || 0) + wth.amount;
-      userWalletStore.balance = userObj.balance;
-    } else {
-      userWalletStore.balance += wth.amount;
-    }
+  let userObj = registeredUsers.find(u => 
+    (cleanMobile && u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile) ||
+    (wth.user && wth.user.includes(u.mobile))
+  );
 
-    saveDiskStore();
-    console.log(`[Admin Withdrawal] Rejected & Refunded ₹${wth.amount} back to ${wth.user}`);
-    return res.json({ success: true, message: `Withdrawal rejected. ₹${wth.amount} refunded back to user wallet!`, withdrawal: wth });
+  if (userObj) {
+    userObj.balance = (userObj.balance || 0) + wth.amount;
+    userWalletStore.balance = userObj.balance;
   }
 
-  res.json({ success: true, message: 'Withdrawal already rejected', withdrawal: wth });
+  // Update MongoDB Atlas
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const WithdrawalRequest = require('../models/WithdrawalRequest');
+      const User = require('../models/User');
+
+      await WithdrawalRequest.updateOne({ _id: wth._id }, { $set: { status: 'rejected' } });
+
+      if (cleanMobile) {
+        await User.updateOne({ mobile: cleanMobile }, { $inc: { wallet_balance: wth.amount } });
+      }
+    }
+  } catch (e) {}
+
+  saveDiskStore();
+  console.log(`[Admin Withdrawal] Rejected & Refunded ₹${wth.amount} back to ${wth.user}`);
+  res.json({ success: true, message: `Withdrawal rejected. ₹${wth.amount} refunded back to user wallet!`, withdrawal: wth });
 };
 
 // @desc    Admin update user wallet balance
