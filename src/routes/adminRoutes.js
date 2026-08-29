@@ -5,6 +5,7 @@ const {
   getUsers,
   getBetMatrix,
   getAdminBets,
+  updateAdminBid,
   getGameSchedules,
   updateGameSchedule,
   getDeposits,
@@ -57,6 +58,7 @@ router.get('/users', getUsers);
 router.get('/matrix', getBetMatrix);
 router.get('/bets', getAdminBets);
 router.get('/bids', getAdminBets);
+router.post('/update-bid', updateAdminBid);
 router.get('/schedules', getGameSchedules);
 router.post('/update-schedule', updateGameSchedule);
 router.post('/update-user-wallet', updateUserWallet);

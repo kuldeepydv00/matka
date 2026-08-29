@@ -808,6 +808,50 @@ const getAdminBets = async (req, res) => {
   res.json(memoryBets);
 };
 
+// @desc    Update bid number / amount (Admin Control)
+// @route   POST /api/admin/update-bid
+const updateAdminBid = async (req, res) => {
+  const { id, number, amount, status } = req.body;
+  if (!id) {
+    return res.status(400).json({ success: false, message: 'Bid ID is required' });
+  }
+
+  const numVal = number !== undefined ? parseInt(number) : undefined;
+  const amtVal = amount !== undefined ? parseFloat(amount) : undefined;
+
+  // Update in memoryBets store
+  const targetMemoryBet = memoryBets.find(b => String(b._id || b.id) === String(id));
+  if (targetMemoryBet) {
+    if (numVal !== undefined && !isNaN(numVal)) targetMemoryBet.number = numVal;
+    if (amtVal !== undefined && !isNaN(amtVal)) {
+      targetMemoryBet.bet_amount = amtVal;
+      targetMemoryBet.potential_payout = amtVal * 95;
+    }
+    if (status) targetMemoryBet.status = status;
+  }
+
+  // Sync with MongoDB Atlas if connected
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const Bet = require('../models/Bet');
+      const updateData = {};
+      if (numVal !== undefined && !isNaN(numVal)) updateData.number = numVal;
+      if (amtVal !== undefined && !isNaN(amtVal)) {
+        updateData.bet_amount = amtVal;
+        updateData.potential_payout = amtVal * 95;
+      }
+      if (status) updateData.status = status;
+      await Bet.findByIdAndUpdate(id, updateData);
+    }
+  } catch (e) {
+    console.error('[Admin Update Bid DB Error]', e);
+  }
+
+  saveDiskStore();
+  res.json({ success: true, message: `Bid ${id} updated successfully`, number: numVal, amount: amtVal });
+};
+
 // @desc    Get referral configuration
 // @route   GET /api/admin/referral-config
 const getReferralConfig = async (req, res) => {
@@ -1063,6 +1107,7 @@ module.exports = {
   getUsers,
   getBetMatrix,
   getAdminBets,
+  updateAdminBid,
   getGameSchedules,
   updateGameSchedule,
   declareGameResult,
