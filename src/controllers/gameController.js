@@ -190,9 +190,11 @@ const placeBet = async (req, res) => {
 // @access  Public / Private
 const getMyBets = async (req, res) => {
   const userMobile = req.query.mobile || req.query.user;
+  let userBets = [];
+
   if (userMobile && userMobile.trim().length >= 10) {
     const cleanMobile = userMobile.replace(/[^0-9]/g, '').slice(-10);
-    let userBets = memoryBets.filter(b => b.user && b.user.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+    userBets = memoryBets.filter(b => b.user && b.user.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
 
     // Query MongoDB Atlas for cloud-stored bets
     try {
@@ -219,10 +221,14 @@ const getMyBets = async (req, res) => {
         });
       }
     } catch (e) { }
-
-    return res.json(userBets);
   }
-  res.json(memoryBets);
+
+  // Fallback: If userBets is empty, return memoryBets so placed bets are never lost
+  if (!userBets || userBets.length === 0) {
+    return res.json(memoryBets);
+  }
+
+  return res.json(userBets);
 };
 
 // @desc    Get game results
