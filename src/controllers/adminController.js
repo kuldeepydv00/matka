@@ -1042,21 +1042,26 @@ const getAdminAdmins = async (req, res) => {
 };
 
 const getAdminWinnings = async (req, res) => {
-  const winningBets = memoryBets.filter(b => b.status === 'won' || b.win_amount > 0);
-  res.json(winningBets.map((b, i) => ({
-    id: b.id || b._id || `win_${i+1}`,
-    category: b.game_name || 'Gali',
-    name: b.userName || 'Player',
-    email: 'player@95xmatka.com',
-    mobile: b.user || '****',
-    userId: b.user || 'usr_1',
-    amount: b.win_amount || (b.bet_amount * 95),
-    txnId: `TXN_WIN_${1000 + i}`,
-    type: 'Winning Credit',
-    status: 'Success',
-    dateOfWinning: b.created_at || 'Today',
-    dateOfTxn: b.created_at || 'Today'
-  })));
+  const winningBets = memoryBets.filter(b => b.status === 'won' || b.win_amount > 0 || b.winAmount > 0 || b.status === 'Won');
+  res.json(winningBets.map((b, i) => {
+    const rawUser = b.user || b.mobile || '';
+    const cleanMobile = rawUser.replace(/[^0-9]/g, '').slice(-10) || '8580642004';
+    const winAmt = b.win_amount || b.winAmount || (b.bet_amount * 95);
+    return {
+      id: b.id || b._id || `win_${i+1}`,
+      category: b.game_name || b.category || 'Desawar',
+      user: rawUser.includes('(') ? rawUser.split('(')[0].trim() : (b.name || 'Player'),
+      email: 'player@pk.com',
+      mobile: cleanMobile,
+      userId: (18426 - i).toString(),
+      amount: winAmt,
+      txnId: b.txnId || `06EDEACE83C${6988 + i}BB`,
+      txnType: 'Winning amount',
+      status: 'SUCCESS',
+      dateOfWinning: b.created_at ? new Date(b.created_at).toISOString().split('T')[0] : '2026-08-29',
+      dateOfTxn: b.created_at ? new Date(b.created_at).toISOString().replace('T', ' ').substring(0, 19) : '2026-08-29 05:52:35'
+    };
+  }));
 };
 
 const getGameLedger = async (req, res) => {
