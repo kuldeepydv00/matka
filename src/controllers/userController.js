@@ -447,6 +447,7 @@ const requestWithdrawal = async (req, res) => {
     account_name: holder_name || (targetUser ? targetUser.name : 'User'),
     amount: numAmt,
     status: 'Pending',
+    balanceDeducted: true,
     payment_method: method || 'Bank Transfer',
     payment_details: details || finalAccNo,
     account_number: finalAccNo,

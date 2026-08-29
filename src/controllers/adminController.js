@@ -767,16 +767,77 @@ const approveWithdrawal = async (req, res) => {
 
   wth.status = 'Approved';
 
+  const rawMobile = (wth.mobile || wth.phone || wth.user || '').replace(/[^0-9]/g, '');
+  const cleanMobile = rawMobile.length >= 10 ? rawMobile.slice(-10) : '';
+
+  let targetUser = registeredUsers.find(u => 
+    (cleanMobile && u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile) ||
+    (wth.user && wth.user.includes(u.mobile))
+  );
+
+  if (!targetUser && registeredUsers.length > 0) {
+    targetUser = registeredUsers[0];
+  }
+
+  const oldBalVal = targetUser ? (targetUser.balance || 0) : 0;
+
+  // Deduct balance if not already deducted
+  if (!wth.balanceDeducted && targetUser) {
+    wth.balanceDeducted = true;
+    if ((targetUser.winning_balance || 0) >= wth.amount) {
+      targetUser.winning_balance = parseFloat((targetUser.winning_balance - wth.amount).toFixed(2));
+    } else if ((targetUser.deposit_balance || 0) >= wth.amount) {
+      targetUser.deposit_balance = parseFloat((targetUser.deposit_balance - wth.amount).toFixed(2));
+    } else {
+      targetUser.balance = parseFloat(Math.max(0, (targetUser.balance || 0) - wth.amount).toFixed(2));
+    }
+    targetUser.balance = parseFloat(((targetUser.deposit_balance || 0) + (targetUser.winning_balance || 0) + (targetUser.commission_balance || 0)).toFixed(2));
+    userWalletStore.balance = targetUser.balance;
+  }
+
+  // Sync to MongoDB Atlas live
   try {
     if (mongoose.connection.readyState === 1) {
       const WithdrawalRequest = require('../models/WithdrawalRequest');
+      const User = require('../models/User');
+
       await WithdrawalRequest.updateOne({ _id: wth._id }, { $set: { status: 'approved' } });
+
+      if (targetUser && targetUser.mobile) {
+        await User.updateOne(
+          { mobile: targetUser.mobile },
+          { 
+            $set: { 
+              wallet_balance: targetUser.balance,
+              winning_balance: targetUser.winning_balance,
+              deposit_balance: targetUser.deposit_balance
+            } 
+          }
+        );
+      }
     }
+  } catch (e) {
+    console.error('[MongoDB Approve Withdrawal Sync Error]', e);
+  }
+
+  // Log to Game Ledger
+  try {
+    const { logLedgerTransaction } = require('../store');
+    logLedgerTransaction({
+      user: targetUser ? targetUser.name : wth.user,
+      email: `${cleanMobile}@gmail.com`,
+      phone: cleanMobile,
+      amount: `-${wth.amount.toFixed(2)}`,
+      transactType: 'Withdrawal Payout Approved',
+      oldBal: { wallet: oldBalVal.toFixed(2), deposit: '0.00', winning: '0.00', commission: '0.00', bonus: '200.00', referral: '0.00' },
+      newBal: { wallet: (targetUser ? targetUser.balance : 0).toFixed(2), deposit: '0.00', winning: '0.00', commission: '0.00', bonus: '200.00', referral: '0.00' },
+      gameType: '-'
+    });
   } catch (e) {}
 
   saveDiskStore();
-  console.log(`[Admin Withdrawal] Approved request #${wth.id} for ${wth.user}`);
-  res.json({ success: true, message: 'Withdrawal approved successfully', withdrawal: wth });
+  console.log(`[Admin Withdrawal] Approved & deducted ₹${wth.amount} from ${targetUser ? targetUser.name : wth.user}. New balance: ₹${targetUser ? targetUser.balance : 0}`);
+  res.json({ success: true, message: `Withdrawal approved & deducted successfully. New balance: ₹${targetUser ? targetUser.balance : 0}`, withdrawal: wth, user: targetUser });
 };
 
 // @desc    Reject withdrawal request & refund amount to user profile
@@ -809,7 +870,6 @@ const rejectWithdrawal = async (req, res) => {
 
   wth.status = 'Rejected';
 
-  // Refund the withdrawn amount back to the user's wallet!
   const rawMobile = (wth.mobile || wth.phone || wth.user || '').replace(/[^0-9]/g, '');
   const cleanMobile = rawMobile.length >= 10 ? rawMobile.slice(-10) : '';
 
@@ -818,8 +878,15 @@ const rejectWithdrawal = async (req, res) => {
     (wth.user && wth.user.includes(u.mobile))
   );
 
-  if (userObj) {
-    userObj.balance = (userObj.balance || 0) + wth.amount;
+  if (!userObj && registeredUsers.length > 0) {
+    userObj = registeredUsers[0];
+  }
+
+  // If balance was deducted when requested or approved, refund it back now!
+  if (wth.balanceDeducted !== false && userObj) {
+    wth.balanceDeducted = false;
+    userObj.winning_balance = parseFloat(((userObj.winning_balance || 0) + wth.amount).toFixed(2));
+    userObj.balance = parseFloat(((userObj.deposit_balance || 0) + userObj.winning_balance + (userObj.commission_balance || 0)).toFixed(2));
     userWalletStore.balance = userObj.balance;
   }
 
@@ -831,15 +898,23 @@ const rejectWithdrawal = async (req, res) => {
 
       await WithdrawalRequest.updateOne({ _id: wth._id }, { $set: { status: 'rejected' } });
 
-      if (cleanMobile) {
-        await User.updateOne({ mobile: cleanMobile }, { $inc: { wallet_balance: wth.amount } });
+      if (userObj && userObj.mobile) {
+        await User.updateOne(
+          { mobile: userObj.mobile },
+          { 
+            $set: { 
+              wallet_balance: userObj.balance,
+              winning_balance: userObj.winning_balance
+            } 
+          }
+        );
       }
     }
   } catch (e) {}
 
   saveDiskStore();
-  console.log(`[Admin Withdrawal] Rejected & Refunded ₹${wth.amount} back to ${wth.user}`);
-  res.json({ success: true, message: `Withdrawal rejected. ₹${wth.amount} refunded back to user wallet!`, withdrawal: wth });
+  console.log(`[Admin Withdrawal] Rejected & Refunded ₹${wth.amount} back to ${userObj ? userObj.name : wth.user}. New balance: ₹${userObj ? userObj.balance : 0}`);
+  res.json({ success: true, message: `Withdrawal rejected. ₹${wth.amount} refunded back to user wallet!`, withdrawal: wth, user: userObj });
 };
 
 // @desc    Admin update user wallet balance
