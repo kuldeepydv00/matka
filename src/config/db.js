@@ -16,7 +16,7 @@ const connectDB = async () => {
         dbUsers.forEach(dbU => {
           if (dbU.mobile) {
             const cleanMobile = dbU.mobile.replace(/[^0-9]/g, '').slice(-10);
-            let existing = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+            let existing = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
             if (!existing) {
               existing = {
                 id: dbU._id.toString(),

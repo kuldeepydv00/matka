@@ -10,7 +10,7 @@ const registerUser = async (req, res) => {
   }
 
   const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
-  let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+  let user = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
   const finalName = (name && name.trim().length > 0 && name !== 'User') ? name.trim() : (user ? user.name : `User ${cleanMobile.slice(-4)}`);
 
   const ownReferralCode = `REF${cleanMobile}`;
@@ -143,7 +143,7 @@ const loginUser = async (req, res) => {
   }
 
   const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
-  let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+  let user = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
 
   if (!user) {
     // Auto-create user if logging in after OTP verification
@@ -172,7 +172,7 @@ const getUserProfile = async (req, res) => {
   let targetUser = null;
   if (mobile && mobile.trim().length > 0) {
     const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
-    targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+    targetUser = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
 
     try {
       const mongoose = require('mongoose');
@@ -230,7 +230,7 @@ const getWalletBalance = async (req, res) => {
   let targetUser = null;
   if (mobile && mobile.trim().length > 0) {
     const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
-    targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+    targetUser = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
 
     try {
       const User = require('../models/User');
@@ -284,7 +284,7 @@ const updateWalletBalance = async (req, res) => {
     let cleanMobile = '';
     if (mobile) {
       cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
-      targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+      targetUser = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
     }
     if (!targetUser && registeredUsers.length > 0) {
       targetUser = registeredUsers[0];
@@ -331,7 +331,7 @@ const submitDeposit = async (req, res) => {
   const { user, mobile, amount, method, utr } = req.body;
 
   const cleanMobile = (mobile || '').replace(/[^0-9]/g, '').slice(-10);
-  let targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+  let targetUser = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
 
   const numAmount = parseFloat(amount) || 500;
   const utrStr = utr || `UTR${Date.now()}`;
@@ -387,7 +387,7 @@ const requestWithdrawal = async (req, res) => {
   }
 
   const cleanMobile = (mobile || '').replace(/[^0-9]/g, '').slice(-10);
-  let targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+  let targetUser = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
   if (!targetUser && registeredUsers.length > 0) {
     targetUser = registeredUsers[0];
   }
@@ -487,7 +487,7 @@ const verifySmsOtp = async (req, res) => {
 
   if (otp.trim() === '123456') {
     // Ensure user is added to registeredUsers store
-    let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+    let user = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
     if (!user) {
       user = {
         id: `usr_${Date.now()}`,
@@ -516,7 +516,7 @@ const checkUserExists = async (req, res) => {
   }
 
   const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
-  let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+  let user = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
 
   if (!user) {
     try {
@@ -562,7 +562,7 @@ const getReferralDetails = async (req, res) => {
 
   const { memoryBets } = require('../store');
   const cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
-  let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+  let user = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
 
   let rawReferred = [];
   try {
@@ -669,7 +669,7 @@ const applyReferralCode = async (req, res) => {
     return res.status(400).json({ success: false, message: 'You cannot refer yourself' });
   }
 
-  let user = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+  let user = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
 
   try {
     const User = require('../models/User');

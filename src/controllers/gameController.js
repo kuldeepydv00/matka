@@ -66,7 +66,7 @@ const placeBet = async (req, res) => {
   let targetUser = null;
   if (userMobile && userMobile.trim().length >= 10) {
     const cleanMobile = userMobile.replace(/[^0-9]/g, '').slice(-10);
-    targetUser = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+    targetUser = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
   }
   if (!targetUser) {
     targetUser = registeredUsers.find(u => u.mobile.includes('7027709695') || u.name.toLowerCase().includes('yogi')) || registeredUsers[registeredUsers.length - 1];
@@ -142,7 +142,7 @@ const placeBet = async (req, res) => {
         const commRate = (referralConfig.commissionPercentage || 4) / 100;
         const commission = parseFloat((totalStaked * commRate).toFixed(2));
         if (commission > 0) {
-          let referrer = registeredUsers.find(u => u.mobile.replace(/[^0-9]/g, '').slice(-10) === refMobile);
+          let referrer = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === refMobile);
           if (referrer) {
             referrer.commission_balance = parseFloat(((referrer.commission_balance || 0) + commission).toFixed(2));
             referrer.balance = parseFloat(((referrer.deposit_balance || 0) + (referrer.winning_balance || 0) + referrer.commission_balance).toFixed(2));
