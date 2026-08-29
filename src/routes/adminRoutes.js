@@ -36,7 +36,9 @@ const {
   getLeaderboard,
   getPayouts,
   getPackages,
-  getPaymentMethods
+  getPaymentMethods,
+  savePaymentMethod,
+  deletePaymentMethod
 } = require('../controllers/adminController');
 
 router.post('/login', adminLogin);
@@ -49,6 +51,8 @@ router.get('/leaderboard', getLeaderboard);
 router.get('/payouts', getPayouts);
 router.get('/packages', getPackages);
 router.get('/payment-methods', getPaymentMethods);
+router.post('/payment-methods', savePaymentMethod);
+router.delete('/payment-methods/:id', deletePaymentMethod);
 
 router.get('/banner', getBannerConfig);
 router.post('/update-banner', updateBannerConfig);

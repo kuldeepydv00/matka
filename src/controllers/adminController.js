@@ -1479,10 +1479,121 @@ const getPackages = async (req, res) => {
   ]);
 };
 
+let memoryPaymentMethods = [
+  {
+    _id: 'pm_1',
+    id: 'pm_1',
+    name: 'PhonePe / GPay / Paytm UPI',
+    upiId: '8930507940@ybl',
+    upi_id: '8930507940@ybl',
+    merchant_name: 'Matka Official',
+    ordering: 1,
+    qrCode: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=8930507940@ybl',
+    updateDate: new Date().toLocaleDateString(),
+    status: 'Active'
+  }
+];
+
 const getPaymentMethods = async (req, res) => {
-  res.json([
-    { id: '1', name: 'UPI / PhonePe', ordering: 1, upiId: '8930507940@ybl', qrCode: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=8930507940@ybl', updateDate: 'Today', status: 'Active' }
-  ]);
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const PaymentMethod = require('../models/PaymentMethod');
+      const dbPMs = await PaymentMethod.find().sort({ ordering: 1 }).lean();
+      if (dbPMs && dbPMs.length > 0) {
+        memoryPaymentMethods = dbPMs.map(p => ({
+          _id: String(p._id),
+          id: String(p._id),
+          name: p.name || 'UPI Payment',
+          upiId: p.upi_id || p.upiId || '8930507940@ybl',
+          upi_id: p.upi_id || p.upiId || '8930507940@ybl',
+          merchant_name: p.merchant_name || 'Matka Official',
+          ordering: p.ordering || 1,
+          qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${p.upi_id || '8930507940@ybl'}&pn=${encodeURIComponent(p.merchant_name || 'Matka Official')}`,
+          updateDate: p.updateDate || (p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : 'Today'),
+          status: p.status || 'Active'
+        }));
+      }
+    }
+  } catch (e) {
+    console.error('[Get Payment Methods Error]', e);
+  }
+  res.json(memoryPaymentMethods);
+};
+
+const savePaymentMethod = async (req, res) => {
+  const { id, _id, name, upi_id, upiId, merchant_name, ordering, status } = req.body;
+  const targetId = _id || id || `pm_${Date.now()}`;
+  const finalUpi = upi_id || upiId || '8930507940@ybl';
+  const finalName = name || 'UPI Payment';
+  const finalMerchant = merchant_name || 'Matka Official';
+  const finalOrdering = parseInt(ordering) || 1;
+  const finalStatus = status || 'Active';
+  const todayStr = new Date().toLocaleDateString();
+
+  const pmObj = {
+    _id: targetId,
+    id: targetId,
+    name: finalName,
+    upiId: finalUpi,
+    upi_id: finalUpi,
+    merchant_name: finalMerchant,
+    ordering: finalOrdering,
+    qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${finalUpi}&pn=${encodeURIComponent(finalMerchant)}`,
+    updateDate: todayStr,
+    status: finalStatus
+  };
+
+  const existingIdx = memoryPaymentMethods.findIndex(p => String(p._id) === String(targetId) || String(p.id) === String(targetId));
+  if (existingIdx >= 0) {
+    memoryPaymentMethods[existingIdx] = pmObj;
+  } else {
+    memoryPaymentMethods.unshift(pmObj);
+  }
+
+  // Sync to MongoDB Atlas
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const PaymentMethod = require('../models/PaymentMethod');
+      await PaymentMethod.findOneAndUpdate(
+        { _id: targetId },
+        { 
+          $set: { 
+            name: finalName, 
+            upi_id: finalUpi, 
+            merchant_name: finalMerchant, 
+            ordering: finalOrdering, 
+            status: finalStatus,
+            updateDate: todayStr 
+          } 
+        },
+        { upsert: true, new: true }
+      );
+    }
+  } catch (e) {
+    console.error('[Save Payment Method Error]', e);
+  }
+
+  saveDiskStore();
+  console.log(`[Payment Method Saved] ${finalName} (${finalUpi}) - Status: ${finalStatus}`);
+  res.json({ success: true, message: 'Payment method saved successfully!', paymentMethod: pmObj, paymentMethods: memoryPaymentMethods });
+};
+
+const deletePaymentMethod = async (req, res) => {
+  const { id } = req.params;
+  memoryPaymentMethods = memoryPaymentMethods.filter(p => String(p._id) !== String(id) && String(p.id) !== String(id));
+
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const PaymentMethod = require('../models/PaymentMethod');
+      await PaymentMethod.deleteOne({ _id: id });
+    }
+  } catch (e) {}
+
+  saveDiskStore();
+  res.json({ success: true, message: 'Payment method deleted successfully', paymentMethods: memoryPaymentMethods });
 };
 
 module.exports = {
@@ -1521,5 +1632,7 @@ module.exports = {
   getLeaderboard,
   getPayouts,
   getPackages,
-  getPaymentMethods
+  getPaymentMethods,
+  savePaymentMethod,
+  deletePaymentMethod
 };
