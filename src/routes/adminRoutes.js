@@ -53,8 +53,14 @@ router.get('/payouts', getPayouts);
 router.get('/packages', getPackages);
 router.get('/payment-methods', getPaymentMethods);
 router.post('/payment-methods', savePaymentMethod);
+router.post('/payment-methods/save', savePaymentMethod);
 router.delete('/payment-methods/:id', deletePaymentMethod);
 router.post('/payment-methods/:id/toggle', toggleActivePaymentMethod);
+
+router.get('/paymentMethods', getPaymentMethods);
+router.post('/paymentMethods', savePaymentMethod);
+router.delete('/paymentMethods/:id', deletePaymentMethod);
+router.post('/paymentMethods/:id/toggle', toggleActivePaymentMethod);
 
 router.get('/banner', getBannerConfig);
 router.post('/update-banner', updateBannerConfig);
