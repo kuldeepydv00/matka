@@ -10,53 +10,71 @@ const getStats = async (req, res) => {
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
-    const todayISOStr = now.toISOString().split('T')[0];
-    const todayDateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
-    const todayAltStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const getISTDateStrings = () => {
+      const nowIST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+      const yyyy = nowIST.getFullYear();
+      const mm = String(nowIST.getMonth() + 1).padStart(2, '0');
+      const dd = String(nowIST.getDate()).padStart(2, '0');
+      return {
+        iso: `${yyyy}-${mm}-${dd}`,
+        dmy: `${dd}-${mm}-${yyyy}`,
+        ymd: `${yyyy}-${mm}-${dd}`
+      };
+    };
+
+    const istDates = getISTDateStrings();
 
     const isToday = (item) => {
       if (!item) return false;
-      
-      let dateVal = item;
+
+      let dateKey = '';
+      let dateVal = '';
       let mongoId = null;
+
       if (typeof item === 'object' && item !== null) {
-        dateVal = item.createdAt || item.created_at || item.createdDateKey || item.date || item.timestamp;
+        dateKey = item.createdDateKey || item.dateKey || '';
+        dateVal = item.createdAt || item.created_at || item.date || item.timestamp || '';
         mongoId = item._id || item.id;
+      } else {
+        dateVal = String(item);
       }
 
-      // 1. Check MongoDB ObjectId timestamp
+      // 1. Direct match on createdDateKey (e.g. "2026-08-29")
+      if (dateKey) {
+        const kStr = String(dateKey);
+        if (kStr.includes(istDates.iso) || kStr.includes(istDates.dmy) || kStr.includes(istDates.ymd)) {
+          return true;
+        }
+      }
+
+      // 2. Direct string match on dateVal
+      if (dateVal) {
+        const vStr = String(dateVal);
+        if (vStr.includes(istDates.iso) || vStr.includes(istDates.dmy) || vStr.includes(istDates.ymd)) {
+          return true;
+        }
+        // Time-only string like "11:24 PM" created during current session
+        if ((vStr.includes('AM') || vStr.includes('PM')) && !vStr.includes('-') && !vStr.includes('/')) {
+          return true;
+        }
+      }
+
+      // 3. MongoDB ObjectId timestamp check in IST
       if (mongoId) {
         try {
           const mongoose = require('mongoose');
-          if (mongoose.Types.ObjectId.isValid(String(mongoId))) {
-            const idDate = new mongoose.Types.ObjectId(String(mongoId)).getTimestamp();
-            const idISO = idDate.toISOString().split('T')[0];
-            if (idISO === todayISOStr) return true;
+          const idStr = String(mongoId);
+          if (mongoose.Types.ObjectId.isValid(idStr)) {
+            const idDate = new mongoose.Types.ObjectId(idStr).getTimestamp();
+            const idIST = new Date(idDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+            const yyyy = idIST.getFullYear();
+            const mm = String(idIST.getMonth() + 1).padStart(2, '0');
+            const dd = String(idIST.getDate()).padStart(2, '0');
+            const idDateStr = `${yyyy}-${mm}-${dd}`;
+            if (idDateStr === istDates.iso) return true;
           }
         } catch (e) {}
       }
-
-      if (!dateVal) return false;
-
-      // 2. String comparison
-      const str = String(dateVal);
-      if (str.includes(todayDateStr) || str.includes(todayISOStr) || str.includes(todayAltStr)) {
-        return true;
-      }
-
-      // 3. Time-only format like "09:30 PM" (created during current session today)
-      if ((str.includes('AM') || str.includes('PM')) && !str.includes('-') && !str.includes('/')) {
-        return true;
-      }
-
-      // 4. JS Date comparison
-      try {
-        const d = new Date(dateVal);
-        if (!isNaN(d.getTime())) {
-          const dISO = d.toISOString().split('T')[0];
-          return dISO === todayISOStr || (d >= startOfToday && d <= endOfToday);
-        }
-      } catch (e) {}
 
       return false;
     };
