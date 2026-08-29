@@ -194,15 +194,26 @@ const isResultTimeReachedServer = (gameName) => {
   return !isOpen;
 };
 
-// @desc    Declare game result (Instant 24/7 Admin Control)
+// @desc    Declare game result (Instant 24/7 Admin Control with window validation)
 // @route   POST /api/admin/declare-result
 const declareGameResult = async (req, res) => {
-  const { game_name, number, winning_number } = req.body;
+  const { game_name, number, winning_number, bypassWindowCheck } = req.body;
   const rawNum = number !== undefined ? number : winning_number;
   const numVal = parseInt(rawNum);
 
   if (!game_name || isNaN(numVal)) {
     return res.status(400).json({ success: false, message: 'Valid game name and winning number (00-99) required' });
+  }
+
+  // Window Validation: Admin CANNOT declare result when betting window is OPEN (unless explicitly bypassed)
+  if (!bypassWindowCheck && isGameInOpenWindowServer(game_name)) {
+    const sched = gameSchedulesStore[game_name];
+    const closeTime = sched ? sched.close : 'closing time';
+    return res.status(400).json({
+      success: false,
+      isWindowOpen: true,
+      message: `⚠️ Betting window is currently OPEN for ${game_name}! Result can only be declared after window closes at ${closeTime}.`
+    });
   }
 
   declaredResultsMap[game_name] = numVal;
