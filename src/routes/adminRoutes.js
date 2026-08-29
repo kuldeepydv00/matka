@@ -22,6 +22,8 @@ const {
   updateUserWallet,
   getBannerConfig,
   updateBannerConfig,
+  getAppVersionConfig,
+  updateAppVersionConfig,
   getReferralConfig,
   updateReferralConfig,
   getReferralStats,
@@ -50,6 +52,8 @@ router.get('/payment-methods', getPaymentMethods);
 
 router.get('/banner', getBannerConfig);
 router.post('/update-banner', updateBannerConfig);
+router.get('/app-version', getAppVersionConfig);
+router.post('/update-app-version', updateAppVersionConfig);
 router.get('/referral-config', getReferralConfig);
 router.post('/update-referral-config', updateReferralConfig);
 router.get('/referral-stats', getReferralStats);

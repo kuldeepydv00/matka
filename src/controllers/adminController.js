@@ -1258,6 +1258,8 @@ module.exports = {
   updateUserWallet,
   getBannerConfig,
   updateBannerConfig,
+  getAppVersionConfig,
+  updateAppVersionConfig,
   getReferralConfig,
   updateReferralConfig,
   getReferralStats,

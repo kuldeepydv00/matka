@@ -47,6 +47,18 @@ app.get('/', (req, res) => {
   res.send('95XMATKA API (IST) is running...');
 });
 
+app.get('/api/app/version', (req, res) => {
+  const { appVersionConfig } = require('./store');
+  res.json(appVersionConfig || {
+    latestVersionCode: 2,
+    latestVersionName: '1.0.2',
+    minSupportedVersion: 1,
+    apkUrl: 'https://matka-website.vercel.app/app-debug.apk',
+    updateMessage: '🚀 A new performance update is available! Tap Update now to get the latest features & instant wallet sync.',
+    forceUpdate: false
+  });
+});
+
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/user', require('./routes/userRoutes'));

@@ -72,6 +72,15 @@ let bannerConfig = {
   imageUrl: ''
 };
 
+let appVersionConfig = {
+  latestVersionCode: 2,
+  latestVersionName: '1.0.2',
+  minSupportedVersion: 1,
+  apkUrl: 'https://matka-website.vercel.app/app-debug.apk',
+  updateMessage: '🚀 A new performance update is available! Tap Update now to get the latest features & instant wallet sync.',
+  forceUpdate: false
+};
+
 let gameSchedulesStore = {
   "Desawar": {
     name: "Desawar",
@@ -211,6 +220,7 @@ module.exports = {
   gameSchedulesStore,
   bannerConfig,
   referralConfig,
+  appVersionConfig,
   saveDiskStore,
   logLedgerTransaction,
   purgeOldLedger
