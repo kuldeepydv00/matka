@@ -704,7 +704,7 @@ const rejectWithdrawal = async (req, res) => {
 // @desc    Admin update user wallet balance
 // @route   POST /api/admin/update-user-wallet
 const updateUserWallet = async (req, res) => {
-  const { userId, mobile, type, amount } = req.body;
+  const { userId, mobile, type, walletType, transactType, amount } = req.body;
   const val = parseFloat(amount) || 0;
 
   const cleanMobile = mobile ? mobile.replace(/[^0-9]/g, '').slice(-10) : (userId ? userId.replace(/[^0-9]/g, '').slice(-10) : '');
@@ -714,29 +714,78 @@ const updateUserWallet = async (req, res) => {
   );
 
   if (targetUser) {
+    const oldBal = {
+      wallet: (targetUser.balance || 0).toFixed(2),
+      deposit: (targetUser.deposit_balance || 0).toFixed(2),
+      winning: (targetUser.winning_balance || 0).toFixed(2),
+      commission: (targetUser.commission_balance || 0).toFixed(2),
+      bonus: (targetUser.bonus_balance || 200).toFixed(2),
+      referral: ((targetUser.referrals || 0) * 33).toFixed(2)
+    };
+
+    const targetKey = walletType || 'deposit';
     if (type === 'add') {
-      targetUser.balance = (targetUser.balance || 0) + val;
+      if (targetKey === 'deposit') targetUser.deposit_balance = (targetUser.deposit_balance || 0) + val;
+      else if (targetKey === 'winning') targetUser.winning_balance = (targetUser.winning_balance || 0) + val;
+      else if (targetKey === 'bonus') targetUser.bonus_balance = (targetUser.bonus_balance || 0) + val;
+      else if (targetKey === 'commission') targetUser.commission_balance = (targetUser.commission_balance || 0) + val;
+      else targetUser.deposit_balance = (targetUser.deposit_balance || 0) + val;
     } else {
-      targetUser.balance = Math.max(0, (targetUser.balance || 0) - val);
+      if (targetKey === 'deposit') targetUser.deposit_balance = Math.max(0, (targetUser.deposit_balance || 0) - val);
+      else if (targetKey === 'winning') targetUser.winning_balance = Math.max(0, (targetKey.winning_balance || 0) - val);
+      else if (targetKey === 'bonus') targetUser.bonus_balance = Math.max(0, (targetUser.bonus_balance || 0) - val);
+      else if (targetKey === 'commission') targetUser.commission_balance = Math.max(0, (targetUser.commission_balance || 0) - val);
+      else targetUser.deposit_balance = Math.max(0, (targetUser.deposit_balance || 0) - val);
     }
 
+    targetUser.balance = parseFloat(((targetUser.deposit_balance || 0) + (targetUser.winning_balance || 0) + (targetUser.commission_balance || 0)).toFixed(2));
     userWalletStore.balance = targetUser.balance;
+
+    const newBal = {
+      wallet: (targetUser.balance || 0).toFixed(2),
+      deposit: (targetUser.deposit_balance || 0).toFixed(2),
+      winning: (targetUser.winning_balance || 0).toFixed(2),
+      commission: (targetUser.commission_balance || 0).toFixed(2),
+      bonus: (targetUser.bonus_balance || 200).toFixed(2),
+      referral: ((targetUser.referrals || 0) * 33).toFixed(2)
+    };
+
+    // Log transaction to Game Ledger
+    try {
+      const { logLedgerTransaction } = require('../store');
+      logLedgerTransaction({
+        user: targetUser.name || 'User',
+        email: targetUser.email || `${targetUser.mobile}@gmail.com`,
+        phone: targetUser.mobile,
+        amount: (type === 'add' ? `+${val.toFixed(2)}` : `-${val.toFixed(2)}`),
+        transactType: transactType || (type === 'add' ? 'Deposit Manually' : 'Withdrawl Decline'),
+        oldBal,
+        newBal,
+        gameType: '-'
+      });
+    } catch (e) {}
 
     // Sync updated wallet balance to MongoDB Atlas
     try {
       const mongoose = require('mongoose');
       if (mongoose.connection.readyState === 1) {
         const User = require('../models/User');
-        User.findOneAndUpdate(
+        User.updateOne(
           { mobile: targetUser.mobile },
-          { balance: targetUser.balance }
+          {
+            deposit_balance: targetUser.deposit_balance,
+            winning_balance: targetUser.winning_balance,
+            bonus_balance: targetUser.bonus_balance,
+            commission_balance: targetUser.commission_balance,
+            wallet_balance: targetUser.balance
+          }
         ).catch(e => console.error('[MongoDB Wallet Sync Error]', e));
       }
     } catch (e) { }
 
     saveDiskStore();
     console.log(`[Admin Wallet] Updated balance for ${targetUser.name} (${targetUser.mobile}): ${targetUser.balance}`);
-    return res.json({ success: true, message: `Wallet updated for ${targetUser.name}`, newBalance: targetUser.balance });
+    return res.json({ success: true, message: `Wallet updated for ${targetUser.name}`, newBalance: targetUser.balance, user: targetUser });
   }
 
   res.status(404).json({ success: false, message: 'User not found' });
