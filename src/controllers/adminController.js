@@ -1544,31 +1544,6 @@ const savePaymentMethod = async (req, res) => {
     status: finalStatus
   };
 
-  if (finalStatus === 'Active') {
-    memoryPaymentMethods.forEach(p => {
-      if (String(p._id) !== String(targetId) && String(p.id) !== String(targetId)) {
-        p.status = 'Inactive';
-      }
-    });
-  }
-
-  let existingIdx = memoryPaymentMethods.findIndex(p => 
-    String(p._id) === String(targetId) || 
-    String(p.id) === String(targetId) ||
-    String(p._id) === String(_id) ||
-    String(p.id) === String(id)
-  );
-
-  if (existingIdx < 0 && memoryPaymentMethods.length > 0) {
-    existingIdx = 0; // Replace default first record
-  }
-
-  if (existingIdx >= 0) {
-    memoryPaymentMethods[existingIdx] = pmObj;
-  } else {
-    memoryPaymentMethods.unshift(pmObj);
-  }
-
   // Sync to MongoDB Atlas
   try {
     const mongoose = require('mongoose');
@@ -1611,6 +1586,30 @@ const savePaymentMethod = async (req, res) => {
     }
   } catch (e) {
     console.error('[Save Payment Method Error]', e);
+  }
+
+  // Always update memory store with the final object
+  if (finalStatus === 'Active') {
+    memoryPaymentMethods.forEach(p => {
+      p.status = 'Inactive';
+    });
+  }
+
+  let existingIdx = memoryPaymentMethods.findIndex(p => 
+    String(p._id) === String(targetId) || 
+    String(p.id) === String(targetId) ||
+    String(p._id) === String(pmObj._id) ||
+    String(p.id) === String(pmObj.id)
+  );
+
+  if (existingIdx < 0 && memoryPaymentMethods.length > 0) {
+    existingIdx = 0; // Overwrite default row
+  }
+
+  if (existingIdx >= 0) {
+    memoryPaymentMethods[existingIdx] = pmObj;
+  } else {
+    memoryPaymentMethods.unshift(pmObj);
   }
 
   saveDiskStore();
