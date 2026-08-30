@@ -364,6 +364,27 @@ const declareGameResult = async (req, res) => {
 
   saveDiskStore();
 
+  // Push Notification & WebSocket Broadcast for Result Declaration
+  const { memoryNotifications } = require('../store');
+  const resultNotif = {
+    _id: `notif_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+    id: `notif_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+    title: `🚀 ${game_name} Result Announced!`,
+    body: `Winning Number for ${game_name} is ${resultStr}. Check your wallet & winnings now! 🏆`,
+    type: 'RESULT_ANNOUNCED',
+    game_name,
+    winning_number: resultStr,
+    createdAt: new Date().toISOString(),
+    createdDateKey: istKey
+  };
+  memoryNotifications.unshift(resultNotif);
+
+  const io = req.app.get('io');
+  if (io) {
+    io.emit('push_notification', resultNotif);
+    io.emit('game_result_declared', { game_name, number: resultStr, winning_number: resultStr });
+  }
+
   // Auto-calculate payouts (95x for Jodi/Crossing, 9.5x for Haroof Ander/Bahar)
   const anderDigit = parseInt(resultStr.charAt(0));
   const baharDigit = parseInt(resultStr.charAt(1));
@@ -1738,6 +1759,92 @@ const deletePaymentMethod = async (req, res) => {
   res.json({ success: true, message: 'Payment method deleted successfully', paymentMethods: memoryPaymentMethods });
 };
 
+const sendCustomNotification = async (req, res) => {
+  let { memoryNotifications, saveDiskStore } = require('../store');
+  const { title, body, targetUser, target } = req.body;
+  if (!title || !body) {
+    return res.status(400).json({ success: false, message: 'Title and body are required' });
+  }
+
+  const notifObj = {
+    _id: `notif_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+    id: `notif_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+    title: title.trim(),
+    body: body.trim(),
+    target: targetUser || target || 'All Users',
+    type: 'CUSTOM_BROADCAST',
+    createdAt: new Date().toISOString()
+  };
+
+  memoryNotifications.unshift(notifObj);
+
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const NotificationModel = mongoose.models.Notification || mongoose.model('Notification', new mongoose.Schema({}, { strict: false }));
+      await NotificationModel.create(notifObj);
+    }
+  } catch (e) {}
+
+  saveDiskStore();
+
+  const io = req.app.get('io');
+  if (io) {
+    io.emit('push_notification', notifObj);
+  }
+
+  console.log(`[Admin Notification Sent] "${title}" - Target: ${notifObj.target}`);
+  res.json({ success: true, message: 'Notification broadcasted successfully!', notification: notifObj, notifications: memoryNotifications });
+};
+
+const getNotifications = async (req, res) => {
+  let { memoryNotifications } = require('../store');
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const NotificationModel = mongoose.models.Notification || mongoose.model('Notification', new mongoose.Schema({}, { strict: false }));
+      const dbNotifs = await NotificationModel.find().sort({ createdAt: -1 }).limit(50).lean();
+      if (dbNotifs && dbNotifs.length > 0) {
+        dbNotifs.forEach(n => {
+          const exists = memoryNotifications.some(m => String(m._id || m.id) === String(n._id));
+          if (!exists) {
+            memoryNotifications.push({
+              _id: String(n._id),
+              id: String(n._id),
+              title: n.title || 'Notification',
+              body: n.body || '',
+              target: n.target || 'All Users',
+              type: n.type || 'SYSTEM',
+              createdAt: n.createdAt ? new Date(n.createdAt).toISOString() : new Date().toISOString()
+            });
+          }
+        });
+      }
+    }
+  } catch (e) {}
+  res.json(memoryNotifications);
+};
+
+const deleteNotification = async (req, res) => {
+  const { id } = req.params;
+  let { memoryNotifications, saveDiskStore } = require('../store');
+  const index = memoryNotifications.findIndex(n => String(n._id) === String(id) || String(n.id) === String(id));
+  if (index >= 0) {
+    memoryNotifications.splice(index, 1);
+  }
+
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const NotificationModel = mongoose.models.Notification || mongoose.model('Notification', new mongoose.Schema({}, { strict: false }));
+      await NotificationModel.deleteOne({ _id: id });
+    }
+  } catch (e) {}
+
+  saveDiskStore();
+  res.json({ success: true, message: 'Notification deleted successfully', notifications: memoryNotifications });
+};
+
 module.exports = {
   getStats,
   getUsers,
@@ -1777,5 +1884,8 @@ module.exports = {
   getPaymentMethods,
   savePaymentMethod,
   deletePaymentMethod,
-  toggleActivePaymentMethod
+  toggleActivePaymentMethod,
+  sendCustomNotification,
+  getNotifications,
+  deleteNotification
 };

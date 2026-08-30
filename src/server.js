@@ -60,11 +60,15 @@ app.get('/api/app/version', (req, res) => {
 });
 
 // Routes
-const { getPaymentMethods, savePaymentMethod, deletePaymentMethod, toggleActivePaymentMethod } = require('./controllers/adminController');
+const { getPaymentMethods, savePaymentMethod, deletePaymentMethod, toggleActivePaymentMethod, getNotifications, sendCustomNotification, deleteNotification } = require('./controllers/adminController');
 app.get('/api/payment-methods', getPaymentMethods);
 app.post('/api/payment-methods', savePaymentMethod);
 app.delete('/api/payment-methods/:id', deletePaymentMethod);
 app.post('/api/payment-methods/:id/toggle', toggleActivePaymentMethod);
+
+app.get('/api/notifications', getNotifications);
+app.post('/api/send-notification', sendCustomNotification);
+app.delete('/api/notifications/:id', deleteNotification);
 
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/user', require('./routes/userRoutes'));

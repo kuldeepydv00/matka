@@ -209,6 +209,8 @@ let referralConfig = {
 // Initial load on server startup
 loadDiskStore();
 
+let memoryNotifications = [];
+
 module.exports = {
   registeredUsers,
   userWalletStore,
@@ -216,6 +218,7 @@ module.exports = {
   memoryWithdrawals,
   memoryBets,
   memoryGameLedger,
+  memoryNotifications,
   declaredResultsMap,
   gameSchedulesStore,
   bannerConfig,

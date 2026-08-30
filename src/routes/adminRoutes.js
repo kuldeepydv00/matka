@@ -39,8 +39,15 @@ const {
   getPaymentMethods,
   savePaymentMethod,
   deletePaymentMethod,
-  toggleActivePaymentMethod
+  toggleActivePaymentMethod,
+  sendCustomNotification,
+  getNotifications,
+  deleteNotification
 } = require('../controllers/adminController');
+
+router.get('/notifications', getNotifications);
+router.post('/send-notification', sendCustomNotification);
+router.delete('/notifications/:id', deleteNotification);
 
 router.post('/login', adminLogin);
 router.post('/verify-otp', verifyAdminOtp);
