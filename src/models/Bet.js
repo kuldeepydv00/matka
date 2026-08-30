@@ -15,5 +15,9 @@ const betSchema = new mongoose.Schema({
   timestamps: { createdAt: 'created_at', updatedAt: false }
 });
 
+// TTL Index: automatically delete bet history older than 60 days (60 * 24 * 60 * 60 = 5184000 seconds)
+betSchema.index({ created_at: 1 }, { expireAfterSeconds: 5184000 });
+
 const Bet = mongoose.model('Bet', betSchema);
 module.exports = Bet;
+
