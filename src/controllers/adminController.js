@@ -27,6 +27,7 @@ const getStats = async (req, res) => {
     const isToday = (item) => {
       if (!item) return false;
 
+      const mongoose = require('mongoose');
       let dateKey = '';
       let dateVal = '';
       let mongoId = null;
@@ -39,32 +40,28 @@ const getStats = async (req, res) => {
         dateVal = String(item);
       }
 
-      // 1. Direct match on createdDateKey (e.g. "2026-08-29")
-      if (dateKey) {
-        const kStr = String(dateKey);
-        if (kStr.includes(istDates.iso) || kStr.includes(istDates.dmy) || kStr.includes(istDates.ymd)) {
-          return true;
-        }
-      }
-
-      // 2. Direct string match on dateVal
-      if (dateVal) {
-        const vStr = String(dateVal);
-        if (vStr.includes(istDates.iso) || vStr.includes(istDates.dmy) || vStr.includes(istDates.ymd)) {
-          return true;
-        }
-        // Time-only string like "11:24 PM" created during current session
-        if ((vStr.includes('AM') || vStr.includes('PM')) && !vStr.includes('-') && !vStr.includes('/')) {
-          return true;
-        }
-      }
-
-      // 3. MongoDB ObjectId timestamp check in IST
+      // 1. Check if ID contains a 13-digit Unix millisecond timestamp (from our custom in-memory ID generator)
       if (mongoId) {
-        try {
-          const mongoose = require('mongoose');
-          const idStr = String(mongoId);
-          if (mongoose.Types.ObjectId.isValid(idStr)) {
+        const idStr = String(mongoId);
+        const match = idStr.match(/(\d{13})/);
+        if (match) {
+          try {
+            const timestamp = parseInt(match[1]);
+            const dateObj = new Date(timestamp);
+            if (!isNaN(dateObj.getTime())) {
+              const itemIST = new Date(dateObj.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+              const yyyy = itemIST.getFullYear();
+              const mm = String(itemIST.getMonth() + 1).padStart(2, '0');
+              const dd = String(itemIST.getDate()).padStart(2, '0');
+              const itemDateStr = `${yyyy}-${mm}-${dd}`;
+              return itemDateStr === istDates.iso;
+            }
+          } catch (e) {}
+        }
+
+        // 2. Check if it's a valid MongoDB ObjectId (which contains creation timestamp)
+        if (mongoose.Types.ObjectId.isValid(idStr)) {
+          try {
             const idDate = new mongoose.Types.ObjectId(idStr).getTimestamp();
             const idIST = new Date(idDate.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
             const yyyy = idIST.getFullYear();
@@ -72,8 +69,37 @@ const getStats = async (req, res) => {
             const dd = String(idIST.getDate()).padStart(2, '0');
             const idDateStr = `${yyyy}-${mm}-${dd}`;
             if (idDateStr === istDates.iso) return true;
+          } catch (e) {}
+        }
+      }
+
+      // 3. Direct match on createdDateKey (e.g. "2026-08-29")
+      if (dateKey) {
+        const kStr = String(dateKey);
+        if (kStr.includes(istDates.iso) || kStr.includes(istDates.dmy) || kStr.includes(istDates.ymd)) {
+          return true;
+        }
+      }
+
+      // 4. Direct string match on dateVal (only if it contains full date info, not just time)
+      if (dateVal) {
+        const vStr = String(dateVal);
+        if (vStr.includes(istDates.iso) || vStr.includes(istDates.dmy) || vStr.includes(istDates.ymd)) {
+          return true;
+        }
+        
+        // Parse only if it contains date indicators (hyphens or slashes)
+        if (vStr.includes('-') || vStr.includes('/') || vStr.includes('GMT') || vStr.includes('Z')) {
+          const parsed = new Date(vStr);
+          if (!isNaN(parsed.getTime())) {
+            const itemIST = new Date(parsed.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+            const yyyy = itemIST.getFullYear();
+            const mm = String(itemIST.getMonth() + 1).padStart(2, '0');
+            const dd = String(itemIST.getDate()).padStart(2, '0');
+            const itemDateStr = `${yyyy}-${mm}-${dd}`;
+            return itemDateStr === istDates.iso;
           }
-        } catch (e) {}
+        }
       }
 
       return false;
