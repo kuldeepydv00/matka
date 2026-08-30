@@ -11,11 +11,16 @@ async function clearRecords() {
     await mongoose.connect(mongoUri);
     console.log('[MongoDB] Connected to database');
     
-    // Clear all collections
+    // Clear only specific transaction/user collections, preserving config collections (banners, paymentmethods, etc.)
+    const targetCollections = ['users', 'bets', 'transactions', 'depositrequests', 'withdrawalrequests', 'resultrecords', 'draws'];
     const collections = mongoose.connection.collections;
     for (const key in collections) {
-      await collections[key].deleteMany({});
-      console.log(`[MongoDB] Cleared collection: ${key}`);
+      if (targetCollections.includes(key.toLowerCase())) {
+        await collections[key].deleteMany({});
+        console.log(`[MongoDB] Cleared collection: ${key}`);
+      } else {
+        console.log(`[MongoDB] Preserved configuration collection: ${key}`);
+      }
     }
     
     // Clear user-related fake data in dataStore.json
