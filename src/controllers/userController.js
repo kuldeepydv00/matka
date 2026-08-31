@@ -111,8 +111,7 @@ const registerUser = async (req, res) => {
           deposit_balance: user.deposit_balance !== undefined ? user.deposit_balance : 0.00,
           winning_balance: user.winning_balance !== undefined ? user.winning_balance : 0.00,
           bonus_balance: user.bonus_balance !== undefined ? user.bonus_balance : 200.00,
-          commission_balance: user.commission_balance !== undefined ? user.commission_balance : 0.00,
-          referral_code: ownReferralCode 
+          commission_balance: user.commission_balance !== undefined ? user.commission_balance : 0.00
         },
         $set: {
           name: user.name,
