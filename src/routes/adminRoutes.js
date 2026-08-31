@@ -22,6 +22,8 @@ const {
   updateUserWallet,
   getBannerConfig,
   updateBannerConfig,
+  getBannersList,
+  saveBannersList,
   getAppVersionConfig,
   updateAppVersionConfig,
   getReferralConfig,
@@ -71,6 +73,8 @@ router.post('/paymentMethods/:id/toggle', toggleActivePaymentMethod);
 
 router.get('/banner', getBannerConfig);
 router.post('/update-banner', updateBannerConfig);
+router.get('/banners', getBannersList);
+router.post('/update-banners-list', saveBannersList);
 router.get('/app-version', getAppVersionConfig);
 router.post('/update-app-version', updateAppVersionConfig);
 router.get('/referral-config', getReferralConfig);

@@ -7,7 +7,7 @@ const connectDB = async () => {
     });
     console.log(`MongoDB Connected: ${conn.connection.host}`);
 
-    const { registeredUsers, memoryBets, saveDiskStore } = require('../store');
+    const { registeredUsers, memoryBets, bannersListStore, saveDiskStore } = require('../store');
 
     // 1. Load all registered users from MongoDB Atlas
     try {
@@ -84,8 +84,17 @@ const connectDB = async () => {
         });
         console.log(`[MongoDB] Loaded ${dbBets.length} bets from Cloud Database into memory.`);
       }
+    // 3. Load all saved banners list from MongoDB
+    try {
+      const BannersListModel = mongoose.model('BannersList', new mongoose.Schema({}, { strict: false }));
+      const dbBanners = await BannersListModel.find({}).lean();
+      if (dbBanners && dbBanners.length > 0) {
+        bannersListStore.length = 0;
+        bannersListStore.push(...dbBanners);
+        console.log(`[MongoDB] Loaded ${dbBanners.length} saved banners list from Cloud Database into memory.`);
+      }
     } catch (e) {
-      console.error('[MongoDB] Bet Hydration Error:', e.message);
+      console.error('[MongoDB] Banners List Hydration Error:', e.message);
     }
 
     saveDiskStore();

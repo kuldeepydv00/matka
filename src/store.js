@@ -168,6 +168,8 @@ let gameSchedulesStore = {
 
 const { chartRecords } = require('./historicalChartStore');
 
+let bannersListStore = [];
+
 function saveDiskStore() {
   try {
     const data = {
@@ -182,7 +184,8 @@ function saveDiskStore() {
       bannerConfig,
       referralConfig,
       appVersionConfig,
-      settingsConfig
+      settingsConfig,
+      bannersListStore
     };
     fs.writeFileSync(STORE_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
@@ -207,6 +210,7 @@ function loadDiskStore() {
       if (data.referralConfig) Object.assign(referralConfig, data.referralConfig);
       if (data.appVersionConfig) Object.assign(appVersionConfig, data.appVersionConfig);
       if (data.settingsConfig) Object.assign(settingsConfig, data.settingsConfig);
+      if (data.bannersListStore && Array.isArray(data.bannersListStore)) bannersListStore.length = 0, bannersListStore.push(...data.bannersListStore);
       console.log(`[Disk Store] Successfully loaded disk data! Registered users: ${registeredUsers.length}`);
     }
   } catch (err) {
@@ -239,6 +243,7 @@ module.exports = {
   referralConfig,
   appVersionConfig,
   settingsConfig,
+  bannersListStore,
   saveDiskStore,
   logLedgerTransaction,
   purgeOldLedger

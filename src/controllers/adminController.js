@@ -1200,6 +1200,40 @@ const updateBannerConfig = async (req, res) => {
   res.json({ success: true, message: 'Banner configuration updated successfully', bannerConfig });
 };
 
+const getBannersList = async (req, res) => {
+  const { bannersListStore } = require('../store');
+  res.json(bannersListStore || []);
+};
+
+const saveBannersList = async (req, res) => {
+  const { banners } = req.body;
+  if (!Array.isArray(banners)) {
+    return res.status(400).json({ error: 'Banners must be an array' });
+  }
+
+  const { bannersListStore, saveDiskStore } = require('../store');
+  bannersListStore.length = 0;
+  bannersListStore.push(...banners);
+  saveDiskStore();
+
+  // Sync to MongoDB
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const BannersListModel = mongoose.model('BannersList', new mongoose.Schema({}, { strict: false }));
+      await BannersListModel.deleteMany({});
+      if (banners.length > 0) {
+        await BannersListModel.insertMany(banners);
+      }
+      console.log(`[MongoDB] Saved banners list: ${banners.length} items.`);
+    }
+  } catch (e) {
+    console.error('[MongoDB Saved Banners Sync Error]', e);
+  }
+
+  res.json({ success: true, message: 'Banners list updated successfully', banners: bannersListStore });
+};
+
 const getAppVersionConfig = async (req, res) => {
   const { appVersionConfig } = require('../store');
   res.json(appVersionConfig || {
@@ -1893,6 +1927,8 @@ module.exports = {
   updateUserWallet,
   getBannerConfig,
   updateBannerConfig,
+  getBannersList,
+  saveBannersList,
   getAppVersionConfig,
   updateAppVersionConfig,
   getReferralConfig,
