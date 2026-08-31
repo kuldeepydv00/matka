@@ -84,6 +84,10 @@ const connectDB = async () => {
         });
         console.log(`[MongoDB] Loaded ${dbBets.length} bets from Cloud Database into memory.`);
       }
+    } catch (e) {
+      console.error('[MongoDB] Bet Hydration Error:', e.message);
+    }
+
     // 3. Load all saved banners list from MongoDB
     try {
       const BannersListModel = mongoose.model('BannersList', new mongoose.Schema({}, { strict: false }));
