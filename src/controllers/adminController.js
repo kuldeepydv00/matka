@@ -1220,7 +1220,7 @@ const saveBannersList = async (req, res) => {
   try {
     const mongoose = require('mongoose');
     if (mongoose.connection.readyState === 1) {
-      const BannersListModel = mongoose.model('BannersList', new mongoose.Schema({}, { strict: false }));
+      const BannersListModel = mongoose.models.BannersList || mongoose.model('BannersList', new mongoose.Schema({}, { strict: false }));
       await BannersListModel.deleteMany({});
       if (banners.length > 0) {
         await BannersListModel.insertMany(banners);

@@ -90,7 +90,7 @@ const connectDB = async () => {
 
     // 3. Load all saved banners list from MongoDB
     try {
-      const BannersListModel = mongoose.model('BannersList', new mongoose.Schema({}, { strict: false }));
+      const BannersListModel = mongoose.models.BannersList || mongoose.model('BannersList', new mongoose.Schema({}, { strict: false }));
       const dbBanners = await BannersListModel.find({}).lean();
       if (dbBanners && dbBanners.length > 0) {
         bannersListStore.length = 0;
