@@ -81,6 +81,16 @@ let appVersionConfig = {
   forceUpdate: false
 };
 
+let settingsConfig = {
+  whatsapp_number: '+917027709695',
+  whatsapp_call_number: '+917027709695',
+  app_download_link: 'https://95xmatka.com/app-debug.apk',
+  app_version: '1.0.0',
+  bank_withdrawal_enable: true,
+  upi_withdrawal_enable: true,
+  lucky_card_maintenance: false
+};
+
 let gameSchedulesStore = {
   "Desawar": {
     name: "Desawar",
@@ -170,7 +180,9 @@ function saveDiskStore() {
       gameSchedulesStore,
       chartRecords,
       bannerConfig,
-      referralConfig
+      referralConfig,
+      appVersionConfig,
+      settingsConfig
     };
     fs.writeFileSync(STORE_FILE, JSON.stringify(data, null, 2), 'utf-8');
   } catch (err) {
@@ -193,6 +205,8 @@ function loadDiskStore() {
       if (data.chartRecords) Object.assign(chartRecords, data.chartRecords);
       if (data.bannerConfig) Object.assign(bannerConfig, data.bannerConfig);
       if (data.referralConfig) Object.assign(referralConfig, data.referralConfig);
+      if (data.appVersionConfig) Object.assign(appVersionConfig, data.appVersionConfig);
+      if (data.settingsConfig) Object.assign(settingsConfig, data.settingsConfig);
       console.log(`[Disk Store] Successfully loaded disk data! Registered users: ${registeredUsers.length}`);
     }
   } catch (err) {
@@ -224,6 +238,7 @@ module.exports = {
   bannerConfig,
   referralConfig,
   appVersionConfig,
+  settingsConfig,
   saveDiskStore,
   logLedgerTransaction,
   purgeOldLedger
