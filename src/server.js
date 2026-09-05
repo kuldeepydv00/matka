@@ -80,10 +80,8 @@ app.post('/api/admin/update-settings', (req, res) => {
     // Sync settings with appVersionConfig so both configurations update
     if (req.body.app_version) {
       store.appVersionConfig.latestVersionName = req.body.app_version;
-      const cleanNum = req.body.app_version.replace(/[^0-9]/g, '');
-      const parsedCode = parseInt(cleanNum);
-      if (!isNaN(parsedCode) && parsedCode > 0) {
-        store.appVersionConfig.latestVersionCode = parsedCode;
+      if (req.body.latestVersionCode !== undefined) {
+        store.appVersionConfig.latestVersionCode = parseInt(req.body.latestVersionCode);
       }
     }
     if (req.body.app_download_link) {
