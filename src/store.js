@@ -17,6 +17,7 @@ let memoryWithdrawals = [];
 let memoryBets = [];
 let memoryGameLedger = [];
 let declaredResultsMap = {};
+let memoryResultsHistory = [];
 
 const FORTY_DAYS_MS = 40 * 24 * 60 * 60 * 1000;
 
@@ -179,6 +180,7 @@ function saveDiskStore() {
       memoryWithdrawals,
       memoryBets,
       declaredResultsMap,
+      memoryResultsHistory,
       gameSchedulesStore,
       chartRecords,
       bannerConfig,
@@ -204,6 +206,7 @@ function loadDiskStore() {
       if (data.memoryWithdrawals && Array.isArray(data.memoryWithdrawals)) memoryWithdrawals.length = 0, memoryWithdrawals.push(...data.memoryWithdrawals);
       if (data.memoryBets && Array.isArray(data.memoryBets)) memoryBets.length = 0, memoryBets.push(...data.memoryBets);
       if (data.declaredResultsMap) Object.assign(declaredResultsMap, data.declaredResultsMap);
+      if (data.memoryResultsHistory && Array.isArray(data.memoryResultsHistory)) memoryResultsHistory.length = 0, memoryResultsHistory.push(...data.memoryResultsHistory);
       if (data.gameSchedulesStore) Object.assign(gameSchedulesStore, data.gameSchedulesStore);
       if (data.chartRecords) Object.assign(chartRecords, data.chartRecords);
       if (data.bannerConfig) Object.assign(bannerConfig, data.bannerConfig);
@@ -238,6 +241,7 @@ module.exports = {
   memoryGameLedger,
   memoryNotifications,
   declaredResultsMap,
+  memoryResultsHistory,
   gameSchedulesStore,
   bannerConfig,
   referralConfig,

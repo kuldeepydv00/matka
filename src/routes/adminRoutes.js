@@ -18,6 +18,8 @@ const {
   rejectWithdrawal,
   declareGameResult,
   clearGameResult,
+  editGameResult,
+  getResultsHistory,
   getDeclaredResults,
   updateUserWallet,
   getBannerConfig,
@@ -95,6 +97,8 @@ router.post('/update-schedule', updateGameSchedule);
 router.post('/update-user-wallet', updateUserWallet);
 router.post('/declare-result', declareGameResult);
 router.post('/clear-result', clearGameResult);
+router.post('/edit-result', editGameResult);
+router.get('/results-history', getResultsHistory);
 router.get('/declared-results', getDeclaredResults);
 
 // Deposits routes

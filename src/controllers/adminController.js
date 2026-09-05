@@ -461,6 +461,30 @@ const declareGameResult = async (req, res) => {
     }
   });
 
+  // Record in memoryResultsHistory for persistent Results Management table
+  const { memoryResultsHistory } = require('../store');
+  const resultEntry = {
+    id: `res_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+    _id: `res_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+    date: istKey,
+    rawDate: new Date().toISOString(),
+    category: game_name,
+    game_name: game_name,
+    number: resultStr,
+    resultNumber: resultStr,
+    created_at: new Date().toISOString(),
+    createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+    declared_by: 'Admin',
+    resultBy: 'Admin'
+  };
+
+  const existingResIdx = memoryResultsHistory.findIndex(r => (r.category === game_name || r.game_name === game_name) && (r.date === istKey || r.date === todayKey));
+  if (existingResIdx >= 0) {
+    memoryResultsHistory[existingResIdx] = resultEntry;
+  } else {
+    memoryResultsHistory.unshift(resultEntry);
+  }
+
   saveDiskStore();
 
   res.json({
@@ -470,6 +494,98 @@ const declareGameResult = async (req, res) => {
     winning_number: numVal,
     declaredResults: declaredResultsMap
   });
+};
+
+// @desc    Edit declared result number
+// @route   POST /api/admin/edit-result
+const editGameResult = async (req, res) => {
+  const { game_name, new_number, date_key } = req.body;
+  const numVal = parseInt(new_number);
+  if (!game_name || isNaN(numVal)) {
+    return res.status(400).json({ success: false, message: 'Game name and valid number required' });
+  }
+
+  const resultStr = String(numVal).padStart(2, '0');
+  declaredResultsMap[game_name] = numVal;
+
+  const todayKey = formatDateKey(new Date());
+  const istNow = new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000));
+  const istKey = date_key || formatDateKey(istNow);
+
+  [todayKey, istKey].forEach(dKey => {
+    if (!chartRecords[dKey]) chartRecords[dKey] = {};
+    chartRecords[dKey][game_name] = resultStr;
+  });
+
+  const { memoryResultsHistory } = require('../store');
+  const target = memoryResultsHistory.find(r => (r.category === game_name || r.game_name === game_name) && (r.date === istKey || r.date === todayKey));
+  if (target) {
+    target.number = resultStr;
+    target.resultNumber = resultStr;
+  } else {
+    memoryResultsHistory.unshift({
+      id: `res_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+      _id: `res_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+      date: istKey,
+      rawDate: new Date().toISOString(),
+      category: game_name,
+      game_name: game_name,
+      number: resultStr,
+      resultNumber: resultStr,
+      created_at: new Date().toISOString(),
+      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+      declared_by: 'Admin',
+      resultBy: 'Admin'
+    });
+  }
+
+  saveDiskStore();
+
+  res.json({
+    success: true,
+    message: `Result for ${game_name} updated to ${resultStr}`,
+    declaredResults: declaredResultsMap
+  });
+};
+
+// @desc    Get all declared results history for Admin Panel
+// @route   GET /api/admin/results-history
+const getResultsHistory = async (req, res) => {
+  try {
+    const { memoryResultsHistory, declaredResultsMap } = require('../store');
+    
+    // Ensure all currently declared results in declaredResultsMap are present
+    const istNow = new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000));
+    const istKey = formatDateKey(istNow);
+
+    Object.keys(declaredResultsMap).forEach(game => {
+      const numVal = declaredResultsMap[game];
+      if (numVal !== undefined && numVal !== null) {
+        const numStr = String(numVal).padStart(2, '0');
+        const exists = memoryResultsHistory.some(r => (r.category === game || r.game_name === game) && (r.date === istKey));
+        if (!exists) {
+          memoryResultsHistory.unshift({
+            id: `res_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+            _id: `res_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+            date: istKey,
+            rawDate: new Date().toISOString(),
+            category: game,
+            game_name: game,
+            number: numStr,
+            resultNumber: numStr,
+            created_at: new Date().toISOString(),
+            createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+            declared_by: 'Admin',
+            resultBy: 'Admin'
+          });
+        }
+      }
+    });
+
+    res.json(memoryResultsHistory);
+  } catch (e) {
+    res.json([]);
+  }
 };
 
 // @desc    Clear / Reset declared result for a game
@@ -486,14 +602,21 @@ const clearGameResult = async (req, res) => {
   if (game_name === 'Shree Ganesh') delete declaredResultsMap['Shri Ganesh'];
   if (game_name === 'Shri Ganesh') delete declaredResultsMap['Shree Ganesh'];
 
+  const { memoryResultsHistory } = require('../store');
+  const istNow = new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000));
+  const istKey = formatDateKey(istNow);
+  const todayKey = formatDateKey(new Date());
+
+  const idx = memoryResultsHistory.findIndex(r => (r.category === game_name || r.game_name === game_name) && (r.date === istKey || r.date === todayKey));
+  if (idx >= 0) {
+    memoryResultsHistory.splice(idx, 1);
+  }
+
   // Delete record from MongoDB Atlas
   try {
     const mongoose = require('mongoose');
     if (mongoose.connection.readyState === 1) {
       const ResultRecord = require('../models/ResultRecord');
-      const todayKey = formatDateKey(new Date());
-      const istNow = new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000));
-      const istKey = formatDateKey(istNow);
       ResultRecord.deleteMany({ game_name, date_key: { $in: [todayKey, istKey] } }).catch(e => console.error('[MongoDB Delete Error]', e));
     }
   } catch (e) {}
@@ -2052,26 +2175,6 @@ const deleteAdminBid = async (req, res) => {
   } catch (e) {
     res.json({ success: false, message: e.message });
   }
-};
-
-
-
-const editGameResult = async (req, res) => {
-  const { game_name, new_number, date_key } = req.body;
-  if (!game_name || !new_number) return res.status(400).json({ success: false, message: 'Missing fields' });
-  const { chartRecords, saveDiskStore } = require('../store');
-  const dKey = date_key || require('./gameController').formatDateKey(new Date());
-  if (!chartRecords[dKey]) chartRecords[dKey] = {};
-  chartRecords[dKey][game_name] = String(new_number).padStart(2, '0');
-  saveDiskStore();
-  res.json({ success: true, message: 'Result edited' });
-};
-
-const getResultsHistory = async (req, res) => {
-  const { chartRecords } = require('../store');
-  res.json(chartRecords || {});
-};
-
 module.exports = {
   editGameResult,
   getResultsHistory,
