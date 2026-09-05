@@ -26,6 +26,8 @@ const {
   saveBannersList,
   getAppVersionConfig,
   updateAppVersionConfig,
+  getSettingsConfig,
+  updateSettingsConfig,
   getReferralConfig,
   updateReferralConfig,
   getReferralStats,
@@ -77,6 +79,8 @@ router.get('/banners', getBannersList);
 router.post('/update-banners-list', saveBannersList);
 router.get('/app-version', getAppVersionConfig);
 router.post('/update-app-version', updateAppVersionConfig);
+router.get('/settings', getSettingsConfig);
+router.post('/update-settings', updateSettingsConfig);
 router.get('/referral-config', getReferralConfig);
 router.post('/update-referral-config', updateReferralConfig);
 router.get('/referral-stats', getReferralStats);

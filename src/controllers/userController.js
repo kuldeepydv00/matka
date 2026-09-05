@@ -1,4 +1,4 @@
-const { userWalletStore, registeredUsers, memoryDeposits, memoryWithdrawals, saveDiskStore } = require('../store');
+const { userWalletStore, registeredUsers, memoryDeposits, memoryWithdrawals, memoryBets, saveDiskStore } = require('../store');
 const { formatDateKey } = require('../historicalChartStore');
 
 // @desc    Register a new user
@@ -104,7 +104,7 @@ const registerUser = async (req, res) => {
   try {
     const User = require('../models/User');
     await User.findOneAndUpdate(
-      { mobile: cleanMobile },
+      { mobile: { $regex: new RegExp(cleanMobile + '$') } },
       {
         $setOnInsert: { 
           wallet_balance: user.balance || 0.00,
@@ -177,7 +177,7 @@ const getUserProfile = async (req, res) => {
       const mongoose = require('mongoose');
       if (mongoose.connection.readyState === 1) {
         const User = require('../models/User');
-        const dbUser = await User.findOne({ mobile: cleanMobile }).lean();
+        const dbUser = await User.findOne({ mobile: { $regex: new RegExp(cleanMobile + '$') } }).lean();
         if (dbUser) {
           if (!targetUser) {
             targetUser = {
@@ -233,7 +233,7 @@ const getWalletBalance = async (req, res) => {
 
     try {
       const User = require('../models/User');
-      const dbUser = await User.findOne({ mobile: cleanMobile }).lean();
+      const dbUser = await User.findOne({ mobile: { $regex: new RegExp(cleanMobile + '$') } }).lean();
       if (dbUser) {
         if (!targetUser) {
           targetUser = {
@@ -304,7 +304,7 @@ const updateWalletBalance = async (req, res) => {
       if (mongoose.connection.readyState === 1 && cleanMobile) {
         const User = require('../models/User');
         User.findOneAndUpdate(
-          { mobile: cleanMobile },
+          { mobile: { $regex: new RegExp(cleanMobile + '$') } },
           { wallet_balance: val, name: targetUser ? targetUser.name : 'User' },
           { upsert: true, new: true }
         ).then(() => console.log(`[MongoDB] Updated wallet balance for ${cleanMobile}: ₹${val}`))
@@ -320,7 +320,140 @@ const updateWalletBalance = async (req, res) => {
 // @desc    Get transaction history
 // @route   GET /api/user/wallet/transactions
 const getTransactions = async (req, res) => {
-  res.json([]);
+  try {
+    const { mobile } = req.query;
+    const cleanMobile = (mobile || '').replace(/[^0-9]/g, '').slice(-10);
+    if (!cleanMobile) return res.json([]);
+
+    const txns = [];
+
+    const getEpoch = (obj) => {
+      if (obj.timestamp && typeof obj.timestamp === 'number') return obj.timestamp;
+      if (obj.created_at) {
+        const t = new Date(obj.created_at).getTime();
+        if (!isNaN(t) && t > 100000000000) return t;
+      }
+      if (obj.createdAt) {
+        const t = new Date(obj.createdAt).getTime();
+        if (!isNaN(t) && t > 100000000000) return t;
+      }
+      const rawId = String(obj._id || obj.id || '');
+      const match = rawId.match(/\d{12,14}/);
+      if (match) {
+        const num = parseInt(match[0]);
+        if (!isNaN(num) && num > 100000000000) return num;
+      }
+      return Date.now();
+    };
+
+    // 1. Deposits
+    memoryDeposits.forEach((d, idx) => {
+      const dm = (d.mobile || d.user || '').replace(/[^0-9]/g, '').slice(-10);
+      if (dm === cleanMobile) {
+        const ep = getEpoch(d);
+        const st = (d.status || 'Pending').toUpperCase();
+        txns.push({
+          id: String(d._id || d.id || `dep_${ep}_${idx}`),
+          type: 'DEPOSIT',
+          title: 'Cash Deposited',
+          subtitle: d.method || d.payment_method || 'UPI / PhonePe',
+          amount: parseFloat(d.amount) || 0,
+          isCredit: true,
+          status: st,
+          date: d.createdAt || new Date(ep).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: ep
+        });
+      }
+    });
+
+    // 2. Withdrawals
+    memoryWithdrawals.forEach((w, idx) => {
+      const wm = (w.mobile || w.phone || w.user || '').replace(/[^0-9]/g, '').slice(-10);
+      if (wm === cleanMobile) {
+        const ep = getEpoch(w);
+        const st = (w.status || 'Pending').toUpperCase();
+        txns.push({
+          id: String(w._id || w.id || `wth_${ep}_${idx}`),
+          type: 'WITHDRAW',
+          title: 'Withdrawal',
+          subtitle: w.bank_name || w.bankName || w.method || 'Bank / UPI',
+          amount: parseFloat(w.amount) || 0,
+          isCredit: false,
+          status: st,
+          date: w.createdAt || new Date(ep).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: ep
+        });
+      }
+    });
+
+    // 3. Bets (placed & results)
+    memoryBets.forEach((b, idx) => {
+      const bm = (b.user || b.mobile || '').replace(/[^0-9]/g, '').slice(-10);
+      if (bm === cleanMobile) {
+        const status = (b.status || 'pending').toLowerCase();
+        const winAmt = parseFloat(b.win_amount || b.winAmount || 0);
+        const ep = getEpoch(b);
+        const bTypeStr = (b.bet_type || '').toUpperCase();
+        const isHaroof = bTypeStr.includes('HAR') || bTypeStr.includes('ANDER') || bTypeStr.includes('BAHAR');
+        const formattedNum = isHaroof ? String(b.number !== undefined ? b.number : 0) : String(b.number || 0).padStart(2, '0');
+        const displayBetType = isHaroof ? (bTypeStr.includes('BAHAR') ? 'Haroof Bahar' : 'Haroof Ander') : (b.bet_type || 'Jodi');
+        
+        // Bet placed (debit)
+        txns.push({
+          id: String(b._id || b.id || `bet_${ep}_${idx}`),
+          type: 'BET',
+          title: `Bet Placed - ${b.game_name || 'Game'}`,
+          subtitle: `Number: ${formattedNum} • ${displayBetType}`,
+          amount: parseFloat(b.bet_amount) || 0,
+          isCredit: false,
+          status: status === 'pending' ? 'PENDING' : (status === 'won' ? 'WON' : 'LOST'),
+          date: b.created_at ? new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(ep).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: ep
+        });
+
+        // Winning credit (if won)
+        if (status === 'won' && winAmt > 0) {
+          txns.push({
+            id: String((b._id || b.id || `win_${ep}`) + '_win'),
+            type: 'WINNING',
+            title: `Winning - ${b.game_name || 'Game'}`,
+            subtitle: `Number: ${formattedNum} won! 🎉`,
+            amount: winAmt,
+            isCredit: true,
+            status: 'CREDITED',
+            date: b.created_at ? new Date(b.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date(ep).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            timestamp: ep + 100
+          });
+        }
+      }
+    });
+
+    // 4. Joining Bonus (always placed at user registration time)
+    let userSignupTime = 0;
+    const user = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+    if (user && user.createdAt) {
+      const st = new Date(user.createdAt).getTime();
+      if (!isNaN(st)) userSignupTime = st;
+    }
+    txns.push({
+      id: `bonus_signup_${cleanMobile}`,
+      type: 'BONUS',
+      title: 'Joining Bonus',
+      subtitle: 'Welcome Signup Reward',
+      amount: 200,
+      isCredit: true,
+      status: 'CREDITED',
+      date: user && user.createdAt ? new Date(user.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
+      timestamp: userSignupTime || 1
+    });
+
+    // Sort by timestamp descending (newest on top)
+    txns.sort((a, b) => b.timestamp - a.timestamp);
+
+    res.json(txns);
+  } catch (e) {
+    res.json([]);
+  }
 };
 
 // @desc    Submit deposit request
@@ -396,8 +529,8 @@ const requestWithdrawal = async (req, res) => {
   } = req.body;
   const numAmt = parseFloat(amount);
 
-  if (!numAmt || numAmt < 500) {
-    return res.status(400).json({ success: false, message: 'Minimum withdrawal amount is ₹500' });
+  if (!numAmt || numAmt < 300) {
+    return res.status(400).json({ success: false, message: 'Minimum withdrawal amount is ₹300' });
   }
 
   const cleanMobile = (mobile || '').replace(/[^0-9]/g, '').slice(-10);
@@ -431,9 +564,9 @@ const requestWithdrawal = async (req, res) => {
     } catch (e) {}
   }
 
-  const finalIfsc = ifsc_code || ifsc || ifscCode || (targetUser ? targetUser.ifsc_code : null) || 'SBIN0001234';
-  const finalAccNo = account_number || accountNumber || details || (targetUser ? targetUser.account_number : null) || '6565919794';
-  const finalBankName = bank_name || bankName || (targetUser ? targetUser.bank_name : null) || 'State Bank of India';
+  const finalIfsc = ifsc_code || ifsc || ifscCode || (targetUser ? targetUser.ifsc_code : null) || 'N/A';
+  const finalAccNo = account_number || accountNumber || details || (targetUser ? targetUser.account_number : null) || 'N/A';
+  const finalBankName = bank_name || bankName || (targetUser ? targetUser.bank_name : null) || (finalAccNo !== 'N/A' ? 'Bank Transfer' : 'UPI Transfer');
   const finalUpi = upi_id || upiId || (targetUser ? targetUser.upi_id : null) || (method === 'UPI' ? details : 'N/A');
 
   const newWithdrawal = {
@@ -553,7 +686,7 @@ const checkUserExists = async (req, res) => {
       const mongoose = require('mongoose');
       if (mongoose.connection.readyState === 1) {
         const User = require('../models/User');
-        const dbUser = await User.findOne({ mobile: cleanMobile });
+        const dbUser = await User.findOne({ mobile: { $regex: new RegExp(cleanMobile + '$') } });
         if (dbUser) {
           user = {
             id: dbUser._id,
@@ -758,7 +891,7 @@ const applyReferralCode = async (req, res) => {
   try {
     const User = require('../models/User');
     await User.updateOne(
-      { mobile: cleanMobile },
+      { mobile: { $regex: new RegExp(cleanMobile + '$') } },
       { $set: { referred_by: referrerMobile } }
     );
   } catch (e) {}

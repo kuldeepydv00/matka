@@ -73,11 +73,11 @@ let bannerConfig = {
 };
 
 let appVersionConfig = {
-  latestVersionCode: 1,
-  latestVersionName: '1.0.0',
+  latestVersionCode: 5,
+  latestVersionName: '1.0.5',
   minSupportedVersion: 1,
   apkUrl: 'https://95xmatka.com/app-debug.apk',
-  updateMessage: '🚀 A new performance update is available! Tap Update now to get the latest features & instant wallet sync.',
+  updateMessage: '🚀 Update available with instant push notifications for game results & winning alerts!',
   forceUpdate: false
 };
 

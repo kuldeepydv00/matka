@@ -38,18 +38,27 @@ const placeBet = async (req, res) => {
   const createdBets = [];
 
   for (let item of betItems) {
-    const num = parseInt(item.number);
+    let num = parseInt(item.number);
+    const bType = item.bet_type || item.type || bet_type || 'JODI';
+    const isHaroof = bType.toUpperCase().includes('HAR') || bType.toUpperCase().includes('ANDER') || bType.toUpperCase().includes('BAHAR');
+    if (isHaroof) {
+      num = isNaN(num) ? 0 : Math.abs(num) % 10;
+    } else {
+      if (num === 100) num = 0; // Fix Android App sending 100 for 00
+    }
     const amount = parseFloat(item.bet_amount);
 
     if (!isNaN(num) && amount > 0) {
       totalStaked += amount;
+      const payout = amount * (isHaroof ? 9.5 : 95);
+
       const newBet = {
-        _id: 'bet_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+        _id: 'bet_' + Date.now() + '_' + Math.floor(Math.random() * 10000),
         game_name: targetGame,
-        bet_type: bet_type || 'JODI',
+        bet_type: bType,
         number: num,
         bet_amount: amount,
-        potential_payout: amount * 95,
+        potential_payout: payout,
         win_amount: 0,
         status: 'pending',
         user: mobile || 'User',
@@ -62,14 +71,18 @@ const placeBet = async (req, res) => {
       try {
         Bet.create({
           game_name: targetGame,
-          bet_type: bet_type || 'JODI',
+          bet_type: bType,
           number: num,
           bet_amount: amount,
-          potential_payout: amount * 95,
+          potential_payout: payout,
           win_amount: 0,
           status: 'pending',
           user: mobile || 'User',
           mobile: mobile || ''
+        }).then(createdDoc => {
+          if (createdDoc && createdDoc._id) {
+            newBet._id = String(createdDoc._id);
+          }
         }).catch(e => console.error('[Bet DB Persist Error]:', e.message));
       } catch (e) { }
     }
@@ -213,19 +226,34 @@ const getMyBets = async (req, res) => {
 
   if (userMobile && userMobile.trim().length >= 10) {
     const cleanMobile = userMobile.replace(/[^0-9]/g, '').slice(-10);
-    userBets = memoryBets.filter(b => b.user && b.user.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+    const inMemoryUserBets = memoryBets.filter(b => b.user && b.user.replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
+
+    // Deduplicate in-memory bets first
+    const seenSet = new Set();
+    inMemoryUserBets.forEach(b => {
+      const key = `${b.game_name}_${b.number}_${b.bet_amount}_${b.created_at || ''}`;
+      if (!seenSet.has(key)) {
+        seenSet.add(key);
+        userBets.push(b);
+      }
+    });
 
     // Query MongoDB Atlas for cloud-stored bets
     try {
       const mongoose = require('mongoose');
       if (mongoose.connection.readyState === 1) {
         const Bet = require('../models/Bet');
-        const dbBets = await Bet.find({ $or: [{ mobile: cleanMobile }, { user: { $regex: cleanMobile } }] });
+        const dbBets = await Bet.find({ $or: [{ mobile: cleanMobile }, { user: cleanMobile }] }).lean();
         dbBets.forEach(dbb => {
-          const exists = userBets.some(b => b._id === String(dbb._id) || b.id === String(dbb._id));
+          const dbId = String(dbb._id);
+          const exists = userBets.some(b => 
+            String(b._id || b.id) === dbId ||
+            (b.game_name === dbb.game_name && b.number === dbb.number && Math.abs(b.bet_amount - dbb.bet_amount) < 0.01 &&
+             Math.abs(new Date(b.created_at || Date.now()).getTime() - new Date(dbb.created_at || dbb.createdAt || Date.now()).getTime()) < 20000)
+          );
           if (!exists) {
             userBets.unshift({
-              _id: String(dbb._id),
+              _id: dbId,
               game_name: dbb.game_name,
               bet_type: dbb.bet_type || 'JODI',
               number: dbb.number,
