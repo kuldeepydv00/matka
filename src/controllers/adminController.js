@@ -1695,8 +1695,10 @@ const getDeposits = async (req, res) => {
 
           if (exists) {
             const formattedStatus = d.status ? (d.status.charAt(0).toUpperCase() + d.status.slice(1).toLowerCase()) : 'Pending';
-            // Only update status if memory status is Pending or if DB status is non-pending
-            if (exists.status === 'Pending' || exists.status === 'pending' || formattedStatus === 'Approved' || formattedStatus === 'Rejected') {
+            // Only update status if memory status is Pending or if DB has a non-pending status (Approved/Rejected)
+            if (exists.status === 'Pending' || exists.status === 'pending') {
+              exists.status = formattedStatus;
+            } else if (formattedStatus === 'Approved' || formattedStatus === 'Rejected') {
               exists.status = formattedStatus;
             }
             if (utrKey && utrKey !== 'N/A' && (!exists.utr || exists.utr === 'N/A')) {
@@ -2043,41 +2045,55 @@ const approveDeposit = async (req, res) => {
   });
 };
 
-// @desc    Reject deposit request
+// @desc    Reject deposit request permanently
 const rejectDeposit = async (req, res) => {
   const { id } = req.params;
-  const cleanId = String(id || '');
+  const cleanId = String(id || '').trim();
 
+  // 1. Find all matching deposit entries in memory
   const matchingDeps = memoryDeposits.filter(d => 
-    String(d._id) === cleanId || 
-    String(d.id) === cleanId || 
+    (d._id && String(d._id) === cleanId) || 
+    (d.id && String(d.id) === cleanId) || 
     (d.utr && String(d.utr) === cleanId) || 
     (d.utr_number && String(d.utr_number) === cleanId) ||
     (d.client_txn_id && String(d.client_txn_id) === cleanId)
   );
 
   let dep = matchingDeps[0];
-
   const mongoose = require('mongoose');
 
+  // 2. Fallback search in MongoDB Atlas if not found in memory
   if (!dep && mongoose.connection.readyState === 1) {
     try {
       const DepositRequest = require('../models/DepositRequest');
+      let dbDep = null;
       if (mongoose.Types.ObjectId.isValid(cleanId)) {
-        const dbDep = await DepositRequest.findById(cleanId);
-        if (dbDep) {
-          dep = {
-            _id: dbDep._id,
-            id: String(dbDep._id),
-            user: dbDep.username || 'User',
-            mobile: dbDep.user_id || 'N/A',
-            amount: parseFloat(dbDep.amount) || 0,
-            utr: dbDep.utr_number,
-            status: 'Rejected'
-          };
-          memoryDeposits.unshift(dep);
-          matchingDeps.push(dep);
-        }
+        dbDep = await DepositRequest.findById(cleanId);
+      }
+      if (!dbDep) {
+        dbDep = await DepositRequest.findOne({
+          $or: [
+            { utr_number: cleanId },
+            { utr: cleanId },
+            { client_txn_id: cleanId },
+            { order_id: cleanId }
+          ]
+        });
+      }
+      if (dbDep) {
+        dep = {
+          _id: dbDep._id,
+          id: String(dbDep._id),
+          user: dbDep.username || dbDep.user || 'User',
+          mobile: dbDep.user_id || dbDep.mobile || 'N/A',
+          amount: parseFloat(dbDep.amount) || 0,
+          utr: dbDep.utr_number || dbDep.client_txn_id || cleanId,
+          utr_number: dbDep.utr_number || dbDep.client_txn_id || cleanId,
+          client_txn_id: dbDep.client_txn_id || cleanId,
+          status: 'Rejected'
+        };
+        memoryDeposits.unshift(dep);
+        matchingDeps.push(dep);
       }
     } catch (e) {}
   }
@@ -2091,31 +2107,65 @@ const rejectDeposit = async (req, res) => {
   if (primaryDep.status === 'Approved' || primaryDep.status === 'approved') {
     return res.status(400).json({ success: false, message: 'Cannot reject an already approved deposit' });
   }
-  if (primaryDep.status === 'Rejected' || primaryDep.status === 'rejected') {
-    return res.status(400).json({ success: false, message: 'Deposit request has already been rejected' });
-  }
 
-  matchingDeps.forEach(m => {
-    m.status = 'Rejected';
+  // 3. Mark ALL matching memory items as 'Rejected' (including duplicates)
+  const utrKey = primaryDep.utr || primaryDep.utr_number || primaryDep.client_txn_id;
+  const rawMob = String(primaryDep.mobile || primaryDep.user || '').replace(/[^0-9]/g, '').slice(-10);
+  const amt = parseFloat(primaryDep.amount) || 0;
+
+  memoryDeposits.forEach(m => {
+    const mMob = String(m.mobile || m.user || '').replace(/[^0-9]/g, '').slice(-10);
+    const mAmt = parseFloat(m.amount) || 0;
+    const isUtrMatch = utrKey && utrKey !== 'N/A' && (
+      String(m.utr) === utrKey ||
+      String(m.utr_number) === utrKey ||
+      String(m.client_txn_id) === utrKey
+    );
+    const isIdMatch = (m._id && String(m._id) === cleanId) || (m.id && String(m.id) === cleanId);
+    const isMobAmtMatch = rawMob && mMob === rawMob && Math.abs(mAmt - amt) < 0.01;
+
+    if (isUtrMatch || isIdMatch || isMobAmtMatch) {
+      m.status = 'Rejected';
+    }
   });
-  if (dep) dep.status = 'Rejected';
 
+  // 4. Update MongoDB Atlas across ALL matching field conditions
   try {
     if (mongoose.connection.readyState === 1) {
       const DepositRequest = require('../models/DepositRequest');
+      const orConditions = [
+        { utr_number: cleanId },
+        { utr: cleanId },
+        { client_txn_id: cleanId },
+        { order_id: cleanId }
+      ];
+
       if (mongoose.Types.ObjectId.isValid(cleanId)) {
-        await DepositRequest.updateOne({ _id: cleanId }, { $set: { status: 'rejected' } });
-      } else {
-        await DepositRequest.updateMany(
-          { $or: [{ utr_number: cleanId }, { utr: cleanId }] }, 
-          { $set: { status: 'rejected' } }
+        orConditions.push({ _id: cleanId });
+      }
+      if (primaryDep._id && mongoose.Types.ObjectId.isValid(String(primaryDep._id))) {
+        orConditions.push({ _id: primaryDep._id });
+      }
+      if (utrKey && utrKey !== 'N/A') {
+        orConditions.push(
+          { utr_number: utrKey },
+          { utr: utrKey },
+          { client_txn_id: utrKey },
+          { order_id: utrKey }
         );
       }
+
+      await DepositRequest.updateMany(
+        { $or: orConditions },
+        { $set: { status: 'rejected' } }
+      ).catch(() => {});
     }
-  } catch (e) {}
+  } catch (e) {
+    console.error('[MongoDB Reject Deposit Error]', e);
+  }
 
   saveDiskStore();
-  res.json({ success: true, message: 'Deposit request rejected', deposit: primaryDep });
+  res.json({ success: true, message: 'Deposit request rejected permanently', deposit: primaryDep });
 };
 
 // @desc    Create withdrawal request
