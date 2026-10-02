@@ -8,6 +8,7 @@ const {
   updateAdminBid,
   getGameSchedules,
   updateGameSchedule,
+  toggleMarketStatus,
   getDeposits,
   createDepositRequest,
   approveDeposit,
@@ -48,7 +49,14 @@ const {
   toggleActivePaymentMethod,
   sendCustomNotification,
   getNotifications,
-  deleteNotification
+  deleteNotification,
+  deleteUser,
+  deleteAdminBid,
+  blockUser,
+  unblockUser,
+  updateUser,
+  getLivePlayers,
+  updateLivePlayers
 } = require('../controllers/adminController');
 
 router.get('/notifications', getNotifications);
@@ -88,12 +96,21 @@ router.post('/update-referral-config', updateReferralConfig);
 router.get('/referral-stats', getReferralStats);
 router.get('/stats', getStats);
 router.get('/users', getUsers);
+router.post('/users/update', updateUser);
+router.post('/users/edit', updateUser);
+router.delete('/users/:id', deleteUser);
+router.post('/users/:id/delete', deleteUser);
+router.post('/users/block', blockUser);
+router.post('/users/unblock', unblockUser);
 router.get('/matrix', getBetMatrix);
 router.get('/bets', getAdminBets);
 router.get('/bids', getAdminBets);
+router.delete('/bets/:id', deleteAdminBid);
+router.delete('/bids/:id', deleteAdminBid);
 router.post('/update-bid', updateAdminBid);
 router.get('/schedules', getGameSchedules);
 router.post('/update-schedule', updateGameSchedule);
+router.post('/toggle-market-status', toggleMarketStatus);
 router.post('/update-user-wallet', updateUserWallet);
 router.post('/declare-result', declareGameResult);
 router.post('/clear-result', clearGameResult);
@@ -112,5 +129,9 @@ router.get('/withdrawals', getWithdrawals);
 router.post('/withdrawals/request', createWithdrawalRequest);
 router.post('/withdrawals/:id/approve', approveWithdrawal);
 router.post('/withdrawals/:id/reject', rejectWithdrawal);
+
+// Live Players count (User Change feature)
+router.get('/live-players', getLivePlayers);
+router.post('/live-players', updateLivePlayers);
 
 module.exports = router;

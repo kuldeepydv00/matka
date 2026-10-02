@@ -451,7 +451,7 @@ const declareGameResult = async (req, res) => {
         }
         if (targetUser) {
           targetUser.winning_balance = parseFloat(((targetUser.winning_balance || 0) + payout).toFixed(2));
-          targetUser.balance = parseFloat(((targetUser.deposit_balance || 0) + targetUser.winning_balance + (targetUser.commission_balance || 0)).toFixed(2));
+          targetUser.balance = parseFloat(((targetUser.deposit_balance || 0) + targetUser.winning_balance).toFixed(2));
           userWalletStore.balance = targetUser.balance;
 
           // Sync winning balance & total wallet balance to MongoDB Atlas
@@ -679,7 +679,7 @@ const createDepositRequest = async (req, res) => {
 
   let activeUserStr = user;
   if (!activeUserStr || activeUserStr.includes('8398988077') || activeUserStr.includes('1234567888') || activeUserStr === 'User ()' || activeUserStr === 'User') {
-    activeUserStr = 'yogibbk (7027709695)';
+    activeUserStr = 'yogibbk (7206561420)';
   }
 
   const newDeposit = {
@@ -1423,7 +1423,10 @@ const getReferralStats = async (req, res) => {
       for (let friend of referredFriends) {
         const friendMob = friend.mobile.replace(/[^0-9]/g, '').slice(-10);
         const userBets = memoryBets.filter(b => b.user && b.user.replace(/[^0-9]/g, '').slice(-10) === friendMob);
-        const totalStaked = userBets.reduce((sum, b) => sum + (parseFloat(b.bet_amount) || 0), 0);
+        const totalStaked = userBets.reduce((sum, b) => {
+          const mainAmt = b.wallet_deducted !== undefined ? parseFloat(b.wallet_deducted) : (b.main_wallet_amount !== undefined ? parseFloat(b.main_wallet_amount) : (b.bonus_deducted !== undefined ? Math.max(0, (parseFloat(b.bet_amount) || 0) - (parseFloat(b.bonus_deducted) || 0)) : (parseFloat(b.bet_amount) || 0)));
+          return sum + (isNaN(mainAmt) ? 0 : mainAmt);
+        }, 0);
         const betComm = parseFloat((totalStaked * commRate).toFixed(2));
         const totalFromFriend = signupBonus + betComm;
 
@@ -1911,32 +1914,116 @@ const deleteNotification = async (req, res) => {
 const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { registeredUsers, saveDiskStore } = require('../store');
+    const { 
+      registeredUsers, 
+      memoryBets, 
+      memoryGameLedger, 
+      memoryDeposits, 
+      memoryWithdrawals, 
+      deletedMobiles: storeDeletedMobiles,
+      userWalletStore,
+      saveDiskStore 
+    } = require('../store');
     
     let deletedCount = 0;
+    const deletedMobiles = [];
+    const deletedUserNames = [];
+    const idClean = String(id || '').replace(/[^0-9]/g, '').slice(-10);
+
     for (let i = registeredUsers.length - 1; i >= 0; i--) {
       const u = registeredUsers[i];
-      if (String(u._id) === String(id) || String(u.mobile) === String(id)) {
+      const mobileClean = String(u.mobile || u.phone || '').replace(/[^0-9]/g, '').slice(-10);
+      if (
+        String(u._id) === String(id) || 
+        String(u.id) === String(id) || 
+        String(u.mobile) === String(id) || 
+        (mobileClean && idClean && mobileClean === idClean) ||
+        (u.name && String(u.name).toLowerCase() === String(id).toLowerCase())
+      ) {
+        if (mobileClean) deletedMobiles.push(mobileClean);
+        if (u.name) deletedUserNames.push(u.name);
         registeredUsers.splice(i, 1);
         deletedCount++;
       }
     }
-    if (deletedCount > 0) saveDiskStore();
+    if (idClean && idClean.length >= 10 && !deletedMobiles.includes(idClean)) {
+      deletedMobiles.push(idClean);
+    }
+
+    // Clean up memoryBets for this user
+    for (let i = memoryBets.length - 1; i >= 0; i--) {
+      const b = memoryBets[i];
+      const bm = String(b.mobile || b.phone || b.user || '').replace(/[^0-9]/g, '').slice(-10);
+      if (deletedMobiles.includes(bm) || deletedUserNames.some(un => b.user && b.user.includes(un))) {
+        memoryBets.splice(i, 1);
+      }
+    }
+
+    // Clean up memoryDeposits
+    for (let i = memoryDeposits.length - 1; i >= 0; i--) {
+      const d = memoryDeposits[i];
+      const dm = String(d.mobile || d.phone || d.userPhone || d.user || '').replace(/[^0-9]/g, '').slice(-10);
+      if (deletedMobiles.includes(dm) || deletedUserNames.some(un => d.user && d.user.includes(un))) {
+        memoryDeposits.splice(i, 1);
+      }
+    }
+
+    // Clean up memoryWithdrawals
+    for (let i = memoryWithdrawals.length - 1; i >= 0; i--) {
+      const w = memoryWithdrawals[i];
+      const wm = String(w.mobile || w.phone || w.userPhone || w.user || '').replace(/[^0-9]/g, '').slice(-10);
+      if (deletedMobiles.includes(wm) || deletedUserNames.some(un => w.user && w.user.includes(un))) {
+        memoryWithdrawals.splice(i, 1);
+      }
+    }
+
+    // Clean up memoryGameLedger
+    for (let i = memoryGameLedger.length - 1; i >= 0; i--) {
+      const l = memoryGameLedger[i];
+      const lm = String(l.phone || l.mobile || l.user || '').replace(/[^0-9]/g, '').slice(-10);
+      if (deletedMobiles.includes(lm) || deletedUserNames.some(un => l.user && l.user.includes(un))) {
+        memoryGameLedger.splice(i, 1);
+      }
+    }
+
+    try {
+      if (storeDeletedMobiles) {
+        deletedMobiles.forEach(m => {
+          if (m && !storeDeletedMobiles.includes(m)) storeDeletedMobiles.push(m);
+          if (userWalletStore && userWalletStore[m]) delete userWalletStore[m];
+        });
+      }
+    } catch (e) {}
+
+    saveDiskStore();
     
+    // Delete permanently from MongoDB Atlas
     const mongoose = require('mongoose');
     if (mongoose.connection.readyState === 1) {
-      const User = require('../models/User');
-      
       const orConditions = [];
       if (mongoose.Types.ObjectId.isValid(id)) {
         orConditions.push({ _id: new mongoose.Types.ObjectId(id) });
-        orConditions.push({ _id: id });
       }
-      orConditions.push({ mobile: new RegExp(id + "$") });
-      
-      await User.deleteMany({ $or: orConditions }).catch(()=>{});
+      deletedMobiles.forEach(m => {
+        orConditions.push({ mobile: new RegExp(m + "$") });
+        orConditions.push({ phone: new RegExp(m + "$") });
+        orConditions.push({ user: new RegExp(m + "$") });
+      });
+      deletedUserNames.forEach(un => {
+        orConditions.push({ name: un });
+        orConditions.push({ username: un });
+        orConditions.push({ user: un });
+      });
+
+      if (orConditions.length > 0) {
+        await mongoose.connection.db.collection('users').deleteMany({ $or: orConditions }).catch(()=>{});
+        await mongoose.connection.db.collection('bets').deleteMany({ $or: orConditions }).catch(()=>{});
+        await mongoose.connection.db.collection('transactions').deleteMany({ $or: orConditions }).catch(()=>{});
+        await mongoose.connection.db.collection('depositrequests').deleteMany({ $or: orConditions }).catch(()=>{});
+        await mongoose.connection.db.collection('withdrawalrequests').deleteMany({ $or: orConditions }).catch(()=>{});
+      }
     }
-    res.json({ success: true });
+    res.json({ success: true, message: `User and all related data deleted permanently` });
   } catch (e) {
     res.json({ success: false, message: e.message });
   }

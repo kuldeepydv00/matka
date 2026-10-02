@@ -50,27 +50,33 @@ app.get('/', (req, res) => {
 app.get('/api/app/version', (req, res) => {
   const { appVersionConfig } = require('./store');
   res.json(appVersionConfig || {
-    latestVersionCode: 1,
-    latestVersionName: '1.0.0',
+    latestVersionCode: 48,
+    latestVersionName: '1.0.48',
     minSupportedVersion: 1,
-    apkUrl: 'https://95xmatka.com/app-debug.apk',
-    updateMessage: '🚀 A new performance update is available! Tap Update now to get the latest features & instant wallet sync.',
-    forceUpdate: false
+    apkUrl: 'https://95xmatka.com/95xmatka.apk',
+    updateMessage: '🚀 New Update Available! Market logos updated across Website & Android App. Tap UPDATE NOW!',
+    forceUpdate: true
   });
 });
 
-app.get('/api/app/settings', (req, res) => {
+const getSettingsHandlerRemote = (req, res) => {
   const { settingsConfig } = require('./store');
   res.json(settingsConfig || {
-    whatsapp_number: '+917027709695',
-    whatsapp_call_number: '+917027709695',
-    app_download_link: 'https://95xmatka.com/app-debug.apk',
+    whatsapp_number: '+917206561420',
+    whatsapp_call_number: '+917206561420',
+    app_download_link: 'https://95xmatka.com/95xmatka.apk',
     app_version: '1.0.0',
     bank_withdrawal_enable: true,
     upi_withdrawal_enable: true,
-    lucky_card_maintenance: false
+    lucky_card_maintenance: false,
+    jodi_rate: 97,
+    crossing_rate: 97,
+    haroof_rate: 9.7
   });
-});
+};
+
+app.get('/api/settings', getSettingsHandlerRemote);
+app.get('/api/app/settings', getSettingsHandlerRemote);
 
 app.post('/api/admin/update-settings', (req, res) => {
   const store = require('./store');

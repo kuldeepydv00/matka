@@ -50,31 +50,41 @@ app.get('/', (req, res) => {
 app.get('/api/app/version', (req, res) => {
   const { appVersionConfig } = require('./store');
   res.json(appVersionConfig || {
-    latestVersionCode: 1,
-    latestVersionName: '1.0.0',
+    latestVersionCode: 100,
+    latestVersionName: '1.0.100',
     minSupportedVersion: 1,
-    apkUrl: 'https://95xmatka.com/app-debug.apk',
-    updateMessage: '🚀 A new performance update is available! Tap Update now to get the latest features & instant wallet sync.',
-    forceUpdate: false
+    apkUrl: 'https://95xmatka.com/95xmatka.apk',
+    updateMessage: '🚀 New Update Available! Clean UI, OTP keyboard fixes & fast betting. Tap UPDATE NOW!',
+    forceUpdate: true
   });
 });
 
-app.get('/api/app/settings', (req, res) => {
+const getSettingsHandler = (req, res) => {
   const { settingsConfig } = require('./store');
   res.json(settingsConfig || {
-    whatsapp_number: '+917027709695',
-    whatsapp_call_number: '+917027709695',
-    app_download_link: 'https://95xmatka.com/app-debug.apk',
+    whatsapp_number: '+917206561420',
+    whatsapp_call_number: '+917206561420',
+    app_download_link: 'https://95xmatka.com/95xmatka.apk',
     app_version: '1.0.0',
     bank_withdrawal_enable: true,
     upi_withdrawal_enable: true,
-    lucky_card_maintenance: false
+    lucky_card_maintenance: false,
+    jodi_rate: 97,
+    crossing_rate: 97,
+    haroof_rate: 9.7
   });
-});
+};
+
+app.get('/api/settings', getSettingsHandler);
+app.get('/api/app/settings', getSettingsHandler);
 
 app.post('/api/admin/update-settings', (req, res) => {
   const store = require('./store');
   if (req.body) {
+    if (req.body.jodi_rate !== undefined) store.settingsConfig.jodi_rate = parseFloat(req.body.jodi_rate) || 95;
+    if (req.body.crossing_rate !== undefined) store.settingsConfig.crossing_rate = parseFloat(req.body.crossing_rate) || 95;
+    if (req.body.haroof_rate !== undefined) store.settingsConfig.haroof_rate = parseFloat(req.body.haroof_rate) || 9.5;
+
     Object.assign(store.settingsConfig, req.body);
     
     // Sync settings with appVersionConfig so both configurations update
@@ -86,6 +96,12 @@ app.post('/api/admin/update-settings', (req, res) => {
     }
     if (req.body.app_download_link) {
       store.appVersionConfig.apkUrl = req.body.app_download_link;
+    }
+    if (req.body.updateMessage) {
+      store.appVersionConfig.updateMessage = req.body.updateMessage;
+    }
+    if (req.body.forceUpdate !== undefined) {
+      store.appVersionConfig.forceUpdate = !!req.body.forceUpdate;
     }
     
     store.saveDiskStore();
@@ -110,9 +126,96 @@ app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/user', require('./routes/userRoutes'));
 app.use('/api/game', require('./routes/gameRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
+app.use('/api/payment', require('./routes/paymentRoutes'));
+
+// EKQR Webhook direct alias routes for all possible callback paths
+const paymentController = require('./controllers/paymentController');
+app.all('/api/v1/callbacks/upigateway', paymentController.handleEkqrWebhook);
+app.all('/api/payment/webhook', paymentController.handleEkqrWebhook);
+
+// Background worker to auto-clear yesterday's results when a game's betting window opens or date rolls over
+setInterval(() => {
+  try {
+    const { gameSchedulesStore, declaredResultsMap, declaredResultsDateMap, saveDiskStore } = require('./store');
+    if (!gameSchedulesStore || !declaredResultsMap) return;
+
+    let clearedAny = false;
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const istDate = new Date(utc + (3600000 * 5.5));
+    const currentMinutes = istDate.getHours() * 60 + istDate.getMinutes();
+
+    const yyyy = istDate.getFullYear();
+    const mm = String(istDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(istDate.getDate()).padStart(2, '0');
+    const istTodayKey = `${yyyy}-${mm}-${dd}`;
+
+    const parseTime = (str) => {
+      if (!str) return 0;
+      const match = str.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+      if (!match) return 0;
+      let h = parseInt(match[1]);
+      const m = parseInt(match[2]);
+      const ampm = match[3].toUpperCase();
+      if (ampm === 'PM' && h < 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      return h * 60 + m;
+    };
+
+    Object.keys(declaredResultsMap).forEach(gameName => {
+      const sched = gameSchedulesStore[gameName];
+      if (!sched || !sched.open || !sched.close) return;
+      
+      const openM = parseTime(sched.open);
+      const closeM = parseTime(sched.close);
+      
+      let isOpen = false;
+      if (closeM < openM || gameName === 'Desawar' || gameName === 'Disawer') {
+        isOpen = (currentMinutes >= openM || currentMinutes < closeM);
+      } else {
+        isOpen = (currentMinutes >= openM && currentMinutes < closeM);
+      }
+
+      // Clear result ONLY when the new betting window OPENS (e.g. 4:00 AM for daytime, 12:00 PM for Desawar)
+      // Results remain visible across midnight while the market is closed!
+      const declaredDate = (declaredResultsDateMap && declaredResultsDateMap[gameName]) ? declaredResultsDateMap[gameName] : null;
+      const staleCutoff = new Date(Date.now() - (24 * 60 * 60 * 1000) + (5.5 * 3600000));
+      const staleKey = `${staleCutoff.getUTCFullYear()}-${String(staleCutoff.getUTCMonth() + 1).padStart(2, '0')}-${String(staleCutoff.getUTCDate()).padStart(2, '0')}`;
+      const isStale = declaredDate && declaredDate < staleKey;
+
+      if (isOpen || isStale) {
+        delete declaredResultsMap[gameName];
+        if (declaredResultsDateMap) delete declaredResultsDateMap[gameName];
+        if (gameName === 'Desawar') {
+          delete declaredResultsMap['Disawer'];
+          if (declaredResultsDateMap) delete declaredResultsDateMap['Disawer'];
+        }
+        if (gameName === 'Disawer') {
+          delete declaredResultsMap['Desawar'];
+          if (declaredResultsDateMap) delete declaredResultsDateMap['Desawar'];
+        }
+        if (gameName === 'Shree Ganesh') {
+          delete declaredResultsMap['Shri Ganesh'];
+          if (declaredResultsDateMap) delete declaredResultsDateMap['Shri Ganesh'];
+        }
+        if (gameName === 'Shri Ganesh') {
+          delete declaredResultsMap['Shree Ganesh'];
+          if (declaredResultsDateMap) delete declaredResultsDateMap['Shree Ganesh'];
+        }
+        clearedAny = true;
+      }
+    });
+
+    if (clearedAny) {
+      saveDiskStore();
+      console.log('[Auto-Clear] Cleared old results from live display because new betting window opened.');
+    }
+  } catch(e) {}
+}, 60000);
 
 const PORT = process.env.PORT || 5001;
 
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT} [Timezone: Asia/Kolkata (IST)]`);
 });
+

@@ -61,10 +61,40 @@ const connectDB = async () => {
       if (dbBets && dbBets.length > 0) {
         dbBets.forEach(dbB => {
           const betId = dbB._id.toString();
-          const exists = memoryBets.find(b => b._id === betId);
-          if (!exists) {
+          const dbMob = String(dbB.mobile || dbB.user || '').replace(/[^0-9]/g, '').slice(-10);
+          const dbTime = dbB.created_at ? new Date(dbB.created_at).getTime() : (dbB.createdAt ? new Date(dbB.createdAt).getTime() : 0);
+
+          const existing = memoryBets.find(b => {
+            if (String(b._id || b.id) === betId) return true;
+            const bMob = String(b.user || b.mobile || '').replace(/[^0-9]/g, '').slice(-10);
+            const bTime = b.created_at ? new Date(b.created_at).getTime() : (b.timestamp || 0);
+            if (bMob && dbMob && bMob === dbMob && b.game_name === dbB.game_name && String(b.number) === String(dbB.number) && Math.abs((b.bet_amount || b.amount || 0) - (dbB.bet_amount || 0)) < 0.01 && (bTime === 0 || dbTime === 0 || Math.abs(bTime - dbTime) < 30000)) {
+              b._id = betId;
+              b.id = betId;
+              if (dbB.status && dbB.status !== 'pending') b.status = dbB.status;
+              if (dbB.win_amount && dbB.win_amount > 0) b.win_amount = dbB.win_amount;
+              return true;
+            }
+            return false;
+          });
+
+          if (!existing) {
+            let extractedTs = null;
+            if (dbB.created_at && !isNaN(new Date(dbB.created_at).getTime())) extractedTs = new Date(dbB.created_at).toISOString();
+            else if (dbB.createdAt && !isNaN(new Date(dbB.createdAt).getTime())) extractedTs = new Date(dbB.createdAt).toISOString();
+            else if (dbB.date && !isNaN(new Date(dbB.date).getTime())) extractedTs = new Date(dbB.date).toISOString();
+            else {
+              const rawId = String(betId || '');
+              const match = rawId.match(/\d{12,14}/);
+              if (match) {
+                const num = parseInt(match[0]);
+                if (!isNaN(num) && num > 10000000000) extractedTs = new Date(num).toISOString();
+              }
+            }
+
             memoryBets.push({
               _id: betId,
+              id: betId,
               game_name: dbB.game_name,
               category: dbB.game_name,
               bet_type: dbB.bet_type || 'Single Jodi',
@@ -76,9 +106,9 @@ const connectDB = async () => {
               win_amount: dbB.win_amount || 0,
               status: dbB.status || 'pending',
               user: dbB.user || dbB.mobile || 'User',
+              mobile: dbB.mobile || dbB.user || '',
               phone: dbB.mobile || '1111111131',
-              date: dbB.created_at ? new Date(dbB.created_at).toISOString() : new Date().toISOString(),
-              created_at: dbB.created_at ? new Date(dbB.created_at).toISOString() : new Date().toISOString()
+              ...(extractedTs ? { date: extractedTs, created_at: extractedTs } : {})
             });
           }
         });
