@@ -10,7 +10,14 @@ const betSchema = new mongoose.Schema({
   win_amount: { type: Number, default: 0 },
   status: { type: String, default: 'pending' },
   user: { type: String },
-  mobile: { type: String }
+  mobile: { type: String },
+  number_str: { type: String },
+  multiplier: { type: Number },
+  date_key: { type: String },
+  createdDateKey: { type: String },
+  bonus_deducted: { type: Number },
+  wallet_deducted: { type: Number },
+  main_wallet_amount: { type: Number }
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: false }
 });

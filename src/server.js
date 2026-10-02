@@ -11,8 +11,30 @@ const connectDB = require('./config/db');
 // Load env vars
 dotenv.config();
 
-// Connect to database
-connectDB();
+// Connect to database, then repair any bets whose created_at was overwritten with a later time
+connectDB().catch(() => {}).finally(() => {
+  try {
+    const fs = require('fs');
+    const store = require('./store');
+    const { repairRestampedBets } = require('./utils/betTime');
+    const summary = repairRestampedBets(store.memoryBets, store.gameSchedulesStore);
+    if (summary.fixed > 0) {
+      try {
+        if (store.STORE_FILE && fs.existsSync(store.STORE_FILE)) {
+          const backupFile = `${store.STORE_FILE}.before-bet-time-repair-${Date.now()}.json`;
+          fs.copyFileSync(store.STORE_FILE, backupFile);
+          console.log(`[Bet Time Repair] Backup saved: ${backupFile}`);
+        }
+      } catch (e) { console.error('[Bet Time Repair] Backup failed:', e.message); }
+      store.saveDiskStore();
+      console.log(`[Bet Time Repair] Restored real time + draw date on ${summary.fixed} of ${summary.checked} bets:`, JSON.stringify(summary.byGame));
+    } else {
+      console.log(`[Bet Time Repair] OK - no restamped bets (${summary.checked} checked)`);
+    }
+  } catch (e) {
+    console.error('[Bet Time Repair Error]', e.message);
+  }
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -29,6 +51,12 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Admin API protection (must stay before every /api/admin route, including update-settings below)
+const { adminApiGuard, adminWriteGuard, requireAdmin } = require('./middleware/adminAuth');
+app.use('/api/admin', adminApiGuard);
+app.use(['/api/payment-methods', '/api/send-notification', '/api/notifications', '/api/game/banner'], adminWriteGuard);
+app.use('/api/user/upload-apk-chunk', requireAdmin);
 
 // Make io accessible to routers
 app.set('io', io);

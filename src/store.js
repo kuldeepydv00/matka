@@ -571,6 +571,7 @@ loadDiskStore();
 let memoryNotifications = [];
 
 module.exports = {
+  STORE_FILE,
   registeredUsers,
   userWalletStore,
   memoryDeposits,

@@ -289,12 +289,21 @@ const placeBet = async (req, res) => {
           status: 'pending',
           user: targetUser.name || mobile || 'User',
           mobile: cleanMobile || mobile || '',
+          number_str: formattedNumStr,
           date_key: targetCycleDate,
-          createdDateKey: targetCycleDate
+          createdDateKey: targetCycleDate,
+          created_at: new Date(batchCreatedAt)
         }).then(createdDoc => {
           if (createdDoc && createdDoc._id) {
             newBet._id = String(createdDoc._id);
             newBet.id = String(createdDoc._id);
+            // Persist the bonus/wallet split (calculated after the bet objects are built)
+            if (newBet.bonus_deducted !== undefined) {
+              Bet.updateOne(
+                { _id: createdDoc._id },
+                { $set: { bonus_deducted: newBet.bonus_deducted, wallet_deducted: newBet.wallet_deducted, main_wallet_amount: newBet.main_wallet_amount } }
+              ).catch(() => {});
+            }
           }
         }).catch(e => console.error('[Bet DB Persist Error]:', e.message));
       } catch (e) { }

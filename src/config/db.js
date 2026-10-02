@@ -90,6 +90,19 @@ const connectDB = async () => {
                 const num = parseInt(match[0]);
                 if (!isNaN(num) && num > 10000000000) extractedTs = new Date(num).toISOString();
               }
+              if (!extractedTs) {
+                const { objectIdTime } = require('../utils/betTime');
+                const oidTime = objectIdTime(dbB._id);
+                if (oidTime) extractedTs = oidTime.toISOString();
+              }
+            }
+
+            let hydratedDateKey = dbB.date_key || dbB.createdDateKey;
+            if (!hydratedDateKey && extractedTs) {
+              try {
+                const { getMarketCycleDate } = require('../utils/dateCycle');
+                hydratedDateKey = getMarketCycleDate(dbB.game_name, null, new Date(extractedTs));
+              } catch (e) {}
             }
 
             memoryBets.push({
@@ -108,6 +121,12 @@ const connectDB = async () => {
               user: dbB.user || dbB.mobile || 'User',
               mobile: dbB.mobile || dbB.user || '',
               phone: dbB.mobile || '1111111131',
+              number_str: dbB.number_str,
+              multiplier: dbB.multiplier,
+              bonus_deducted: dbB.bonus_deducted,
+              wallet_deducted: dbB.wallet_deducted,
+              main_wallet_amount: dbB.main_wallet_amount,
+              ...(hydratedDateKey ? { date_key: hydratedDateKey, createdDateKey: hydratedDateKey } : {}),
               ...(extractedTs ? { date: extractedTs, created_at: extractedTs } : {})
             });
           }

@@ -1769,6 +1769,14 @@ const getDeposits = async (req, res) => {
 
   const result = Array.from(depositMap.values());
   result.sort((a, b) => {
+    const statusA = String(a.status || 'Pending').toLowerCase();
+    const statusB = String(b.status || 'Pending').toLowerCase();
+    const isPendingA = statusA === 'pending';
+    const isPendingB = statusB === 'pending';
+
+    if (isPendingA && !isPendingB) return -1;
+    if (!isPendingA && isPendingB) return 1;
+
     const tA = a.timestamp || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
     const tB = b.timestamp || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
     return tB - tA;
@@ -1875,6 +1883,14 @@ const getWithdrawals = async (req, res) => {
     console.error('[Admin Withdrawals Error]', e);
   }
   memoryWithdrawals.sort((a, b) => {
+    const statusA = String(a.status || 'Pending').toLowerCase();
+    const statusB = String(b.status || 'Pending').toLowerCase();
+    const isPendingA = statusA === 'pending';
+    const isPendingB = statusB === 'pending';
+
+    if (isPendingA && !isPendingB) return -1;
+    if (!isPendingA && isPendingB) return 1;
+
     const tA = a.timestamp || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
     const tB = b.timestamp || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
     return tB - tA;
@@ -2770,11 +2786,14 @@ const getAdminBets = async (req, res) => {
     const mongoose = require('mongoose');
     if (mongoose.connection.readyState === 1) {
       const Bet = require('../models/Bet');
-      const dbBets = await Bet.find({}).sort({ createdAt: -1 }).lean();
+      const { getMongoBetTime } = require('../utils/betTime');
+      const dbBets = await Bet.find({}).sort({ created_at: -1 }).lean();
       if (dbBets && dbBets.length > 0) {
         dbBets.forEach(b => {
           const cleanMob = String(b.mobile || b.username || b.user || '').replace(/[^0-9]/g, '').slice(-10);
-          const dbTime = b.createdAt ? new Date(b.createdAt).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+          // Real placement time: created_at (schema field) or the ObjectId time. Never "now".
+          const realTime = getMongoBetTime(b);
+          const dbTime = realTime ? realTime.getTime() : 0;
 
           const exists = memoryBets.some(m => {
             if (String(m._id || m.id) === String(b._id)) return true;
@@ -2804,9 +2823,13 @@ const getAdminBets = async (req, res) => {
               potential_payout: b.potential_payout || (b.bet_amount * (b.multiplier || 90)),
               status: b.status || 'pending',
               win_amount: b.win_amount || b.winAmount || 0,
-              date_key: b.date_key || b.createdDateKey || getGameBetDateKey(b.game_name, b.createdAt),
-              createdDateKey: b.createdDateKey || b.date_key || getGameBetDateKey(b.game_name, b.createdAt),
-              created_at: b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString()
+              number_str: b.number_str,
+              bonus_deducted: b.bonus_deducted,
+              wallet_deducted: b.wallet_deducted,
+              main_wallet_amount: b.main_wallet_amount,
+              date_key: b.date_key || b.createdDateKey || (realTime ? getGameBetDateKey(b.game_name, realTime) : undefined),
+              createdDateKey: b.createdDateKey || b.date_key || (realTime ? getGameBetDateKey(b.game_name, realTime) : undefined),
+              created_at: realTime ? realTime.toISOString() : undefined
             });
           }
         });
@@ -3105,9 +3128,10 @@ const verifyAdminOtp = async (req, res) => {
     const { verifyOtp } = require('../utils/msg91');
     const result = await verifyOtp(ADMIN_PHONE, otp);
     if (result.success) {
+      const { signAdminToken } = require('../middleware/adminAuth');
       return res.json({
         success: true,
-        token: 'admin_session_token_' + Date.now(),
+        token: signAdminToken(),
         admin: {
           username: 'Admin',
           name: 'Admin',
