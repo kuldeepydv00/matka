@@ -1768,6 +1768,19 @@ const getDeposits = async (req, res) => {
   }
 
   const result = Array.from(depositMap.values());
+  result.sort((a, b) => {
+    const statusA = String(a.status || 'Pending').toLowerCase();
+    const statusB = String(b.status || 'Pending').toLowerCase();
+    const isPendingA = statusA === 'pending';
+    const isPendingB = statusB === 'pending';
+
+    if (isPendingA && !isPendingB) return -1;
+    if (!isPendingA && isPendingB) return 1;
+
+    const tA = a.timestamp || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+    const tB = b.timestamp || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+    return tB - tA;
+  });
   res.json(result);
 };
 
@@ -1869,6 +1882,19 @@ const getWithdrawals = async (req, res) => {
   } catch (e) {
     console.error('[Admin Withdrawals Error]', e);
   }
+  memoryWithdrawals.sort((a, b) => {
+    const statusA = String(a.status || 'Pending').toLowerCase();
+    const statusB = String(b.status || 'Pending').toLowerCase();
+    const isPendingA = statusA === 'pending';
+    const isPendingB = statusB === 'pending';
+
+    if (isPendingA && !isPendingB) return -1;
+    if (!isPendingA && isPendingB) return 1;
+
+    const tA = a.timestamp || (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+    const tB = b.timestamp || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+    return tB - tA;
+  });
   res.json(memoryWithdrawals);
 };
 
