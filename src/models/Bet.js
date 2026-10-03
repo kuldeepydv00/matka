@@ -25,6 +25,10 @@ const betSchema = new mongoose.Schema({
 // TTL Index: automatically delete bet history older than 60 days (60 * 24 * 60 * 60 = 5184000 seconds)
 betSchema.index({ created_at: 1 }, { expireAfterSeconds: 5184000 });
 
+// Speed up per-user lookups (my-bets, wallet history)
+betSchema.index({ mobile: 1, created_at: -1 });
+betSchema.index({ user: 1 });
+
 const Bet = mongoose.model('Bet', betSchema);
 module.exports = Bet;
 

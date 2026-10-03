@@ -384,7 +384,9 @@ function assignUniqueEmails(users) {
   });
 }
 
-function saveDiskStore() {
+let saveTimer = null;
+
+function saveDiskStoreImmediate() {
   try {
     assignUniqueEmails(registeredUsers);
     const data = {
@@ -410,24 +412,34 @@ function saveDiskStore() {
       khaiwalPlayersStore,
       khaiwalPlayerBetsStore
     };
-    const payload = JSON.stringify(data, null, 2);
+    const payload = JSON.stringify(data);
     const tmpFile = STORE_FILE + '.tmp';
     const bakFile = STORE_FILE + '.bak';
-    fs.writeFileSync(tmpFile, payload, 'utf-8');
-    fs.renameSync(tmpFile, STORE_FILE);
-    try { fs.writeFileSync(bakFile, payload, 'utf-8'); } catch (e) {}
+    
+    fs.promises.writeFile(tmpFile, payload, 'utf-8').then(() => {
+      fs.rename(tmpFile, STORE_FILE, () => {});
+      fs.promises.writeFile(bakFile, payload, 'utf-8').catch(() => {});
+    }).catch(err => {
+      console.error('[Disk Store] Async Save Error:', err.message);
+    });
 
     const legacyPath = path.join(__dirname, 'dataStore.json');
     if (legacyPath !== STORE_FILE && fs.existsSync(legacyPath)) {
-      try {
-        const legacyTmp = legacyPath + '.tmp';
-        fs.writeFileSync(legacyTmp, payload, 'utf-8');
-        fs.renameSync(legacyTmp, legacyPath);
-      } catch (e) {}
+      const legacyTmp = legacyPath + '.tmp';
+      fs.promises.writeFile(legacyTmp, payload, 'utf-8').then(() => {
+        fs.rename(legacyTmp, legacyPath, () => {});
+      }).catch(() => {});
     }
   } catch (err) {
     console.error('[Disk Store] Save Error:', err.message);
   }
+}
+
+function saveDiskStore() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveDiskStoreImmediate();
+  }, 200);
 }
 
 function loadDiskStore() {

@@ -46,10 +46,11 @@ const getStats = async (req, res) => {
   try {
     const getISTDateStrings = (targetDateObj) => {
       const d = targetDateObj || new Date();
-      const ist = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-      const yyyy = ist.getFullYear();
-      const mm = String(ist.getMonth() + 1).padStart(2, '0');
-      const dd = String(ist.getDate()).padStart(2, '0');
+      const istMs = d.getTime() + (5.5 * 60 * 60 * 1000);
+      const ist = new Date(istMs);
+      const yyyy = ist.getUTCFullYear();
+      const mm = String(ist.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(ist.getUTCDate()).padStart(2, '0');
       return {
         iso: `${yyyy}-${mm}-${dd}`,
         dmy: `${dd}-${mm}-${yyyy}`,
@@ -185,10 +186,11 @@ const getStats = async (req, res) => {
     const getItemISODate = (item) => {
       const d = getItemISTDate(item);
       if (!d || isNaN(d.getTime())) return null;
-      const itemIST = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-      const yyyy = itemIST.getFullYear();
-      const mm = String(itemIST.getMonth() + 1).padStart(2, '0');
-      const dd = String(itemIST.getDate()).padStart(2, '0');
+      const istMs = d.getTime() + (5.5 * 60 * 60 * 1000);
+      const itemIST = new Date(istMs);
+      const yyyy = itemIST.getUTCFullYear();
+      const mm = String(itemIST.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(itemIST.getUTCDate()).padStart(2, '0');
       return `${yyyy}-${mm}-${dd}`;
     };
 
@@ -224,8 +226,9 @@ const getStats = async (req, res) => {
     const getItemHourSlot = (item) => {
       const d = getItemISTDate(item);
       if (!d || isNaN(d.getTime())) return 2;
-      const ist = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
-      const h = ist.getHours();
+      const istMs = d.getTime() + (5.5 * 60 * 60 * 1000);
+      const ist = new Date(istMs);
+      const h = ist.getUTCHours();
       return Math.min(5, Math.max(0, Math.floor(h / 4)));
     };
 
@@ -2789,25 +2792,44 @@ const getAdminBets = async (req, res) => {
       const { getMongoBetTime } = require('../utils/betTime');
       const dbBets = await Bet.find({}).sort({ created_at: -1 }).lean();
       if (dbBets && dbBets.length > 0) {
+        // PERFORMANCE: build lookup tables once (was: a full scan of every memory bet,
+        // with regex work, for every Mongo bet = millions of operations that froze the server)
+        const normMob = (v) => String(v || '').replace(/[^0-9]/g, '').slice(-10);
+        const memById = new Map();
+        const memByKey = new Map();
+        const indexMemBet = (m) => {
+          memById.set(String(m._id || m.id), m);
+          const mMob = normMob(m.mobile || m.user);
+          if (!mMob) return;
+          const k = `${mMob}|${m.game_name}|${String(m.number)}`;
+          let arr = memByKey.get(k);
+          if (!arr) memByKey.set(k, (arr = []));
+          arr.push(m);
+        };
+        memoryBets.forEach(indexMemBet);
+
         dbBets.forEach(b => {
-          const cleanMob = String(b.mobile || b.username || b.user || '').replace(/[^0-9]/g, '').slice(-10);
+          const cleanMob = normMob(b.mobile || b.username || b.user);
           // Real placement time: created_at (schema field) or the ObjectId time. Never "now".
           const realTime = getMongoBetTime(b);
           const dbTime = realTime ? realTime.getTime() : 0;
 
-          const exists = memoryBets.some(m => {
-            if (String(m._id || m.id) === String(b._id)) return true;
-            const mMob = String(m.mobile || m.user || '').replace(/[^0-9]/g, '').slice(-10);
-            const mTime = m.created_at ? new Date(m.created_at).getTime() : (m.timestamp || 0);
-            if (mMob && cleanMob && mMob === cleanMob && m.game_name === b.game_name && String(m.number) === String(b.number) && Math.abs((m.bet_amount || m.amount || 0) - (b.bet_amount || 0)) < 0.01 && (mTime === 0 || dbTime === 0 || Math.abs(mTime - dbTime) < 30000)) {
+          let exists = memById.has(String(b._id));
+          if (!exists && cleanMob) {
+            const candidates = memByKey.get(`${cleanMob}|${b.game_name}|${String(b.number)}`) || [];
+            const m = candidates.find(c => {
+              const mTime = c.created_at ? new Date(c.created_at).getTime() : (c.timestamp || 0);
+              return Math.abs((c.bet_amount || c.amount || 0) - (b.bet_amount || 0)) < 0.01 && (mTime === 0 || dbTime === 0 || Math.abs(mTime - dbTime) < 30000);
+            });
+            if (m) {
               m._id = String(b._id);
               m.id = String(b._id);
               if (b.status && b.status !== 'pending') m.status = b.status;
               if (b.win_amount && b.win_amount > 0) m.win_amount = b.win_amount;
-              return true;
+              memById.set(String(b._id), m);
+              exists = true;
             }
-            return false;
-          });
+          }
 
           if (!exists) {
             memoryBets.unshift({
@@ -2831,6 +2853,7 @@ const getAdminBets = async (req, res) => {
               createdDateKey: b.createdDateKey || b.date_key || (realTime ? getGameBetDateKey(b.game_name, realTime) : undefined),
               created_at: realTime ? realTime.toISOString() : undefined
             });
+            indexMemBet(memoryBets[0]);
           }
         });
       }
@@ -3306,8 +3329,41 @@ const getGameLedger = async (req, res) => {
       if (m) allUserMobiles.add(m);
     });
 
+    // PERFORMANCE: group deposits / bets / withdrawals by mobile ONCE (same matching rules
+    // as matchesMob below). Before, every list was re-scanned with regex for every user.
+    const itemMobiles = (item) => {
+      const mobs = new Set();
+      const rawItemMob = String(item.mobile || item.phone || item.userPhone || '').replace(/[^0-9]/g, '');
+      if (rawItemMob.length >= 10) mobs.add(rawItemMob.slice(-10));
+      const userStrMob = String(item.user || item.username || item.userName || '').replace(/[^0-9]/g, '');
+      if (userStrMob.length >= 10) {
+        for (let i = 0; i + 10 <= userStrMob.length; i++) mobs.add(userStrMob.slice(i, i + 10));
+      }
+      return mobs;
+    };
+    const groupByMobile = (items) => {
+      const map = new Map();
+      (items || []).forEach(item => {
+        if (!item) return;
+        itemMobiles(item).forEach(m => {
+          let arr = map.get(m);
+          if (!arr) map.set(m, (arr = []));
+          arr.push(item);
+        });
+      });
+      return map;
+    };
+    const depsByMob = groupByMobile(allDeps);
+    const betsByMob = groupByMobile(allBets);
+    const wdsByMob = groupByMobile(allWds);
+    const userByMob = new Map();
+    allUsers.forEach(u => {
+      const m = String(u.mobile || '').replace(/[^0-9]/g, '').slice(-10);
+      if (!userByMob.has(m)) userByMob.set(m, u);
+    });
+
     allUserMobiles.forEach(mob => {
-      const userObj = allUsers.find(u => String(u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === mob);
+      const userObj = userByMob.get(mob);
       const name = userObj ? (userObj.name || userObj.username || 'User') : 'User';
       const email = userObj ? (userObj.email || `${mob}@gmail.com`) : `${mob}@gmail.com`;
 
@@ -3339,7 +3395,11 @@ const getGameLedger = async (req, res) => {
       });
 
       // Approved Deposits (including Manual Deposits)
-      allDeps.filter(d => matchesMob(d)).forEach((d, idx) => {
+      const userDeps = mob.length === 10 ? (depsByMob.get(mob) || []) : allDeps.filter(d => matchesMob(d));
+      const userBets = mob.length === 10 ? (betsByMob.get(mob) || []) : allBets.filter(b => matchesMob(b));
+      const userWds = mob.length === 10 ? (wdsByMob.get(mob) || []) : allWds.filter(w => matchesMob(w));
+
+      userDeps.forEach((d, idx) => {
         const t = safeParseTime(d.timestamp || d.created_at || d.createdAt || d.date, signupTime + 1000 + idx * 100, d._id || d.id);
         const depMethod = d.method || d.payment_method || 'UPI / Bank';
         rawEvents.push({
@@ -3355,7 +3415,7 @@ const getGameLedger = async (req, res) => {
       });
 
       // Bids & Winnings
-      allBets.filter(b => matchesMob(b)).forEach((b, idx) => {
+      userBets.forEach((b, idx) => {
         const t = safeParseTime(b.timestamp || b.created_at || b.createdAt || b.date, signupTime + 2000 + idx * 100, b._id || b.id);
         const bAmt = parseFloat(b.bet_amount || b.amount) || 10;
         rawEvents.push({
@@ -3385,7 +3445,7 @@ const getGameLedger = async (req, res) => {
       });
 
       // Withdrawals
-      allWds.filter(w => matchesMob(w)).forEach((w, idx) => {
+      userWds.forEach((w, idx) => {
         const t = safeParseTime(w.timestamp || w.created_at || w.createdAt || w.date, signupTime + 3000 + idx * 100, w._id || w.id);
         const wAmt = parseFloat(w.amount) || 0;
         rawEvents.push({

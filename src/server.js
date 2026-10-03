@@ -58,6 +58,17 @@ app.use('/api/admin', adminApiGuard);
 app.use(['/api/payment-methods', '/api/send-notification', '/api/notifications', '/api/game/banner'], adminWriteGuard);
 app.use('/api/user/upload-apk-chunk', requireAdmin);
 
+// Short-lived cache for heavy read endpoints (runs AFTER the admin guard, so a cached
+// response is never served without a valid admin login)
+const { bumpOnWrite, cacheReads } = require('./middleware/readCache');
+app.use(bumpOnWrite);
+app.use('/api/admin', cacheReads([
+  '/stats', '/users', '/deposits', '/withdrawals', '/bets', '/bids', '/winnings',
+  '/game-ledger', '/results-history', '/declared-results', '/matrix', '/commission-logs',
+  '/payouts', '/leaderboard', '/referral-stats', '/admins', '/banners', '/banner'
+]));
+app.use('/api/game', cacheReads(['/banner', '/banners', '/chart-results', '/schedules']));
+
 // Make io accessible to routers
 app.set('io', io);
 

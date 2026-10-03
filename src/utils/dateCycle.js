@@ -1,10 +1,19 @@
 // Universal Market Cycle Date Calculation for all Matka games in IST timezone
 
+// PERFORMANCE: Intl.DateTimeFormat objects are expensive to create; build them once.
+const IST_DATE_FMT = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' });
+const IST_TIME_FMT = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Asia/Kolkata',
+  hour: 'numeric',
+  minute: 'numeric',
+  hour12: false
+});
+
 function getISTDateStr(d) {
   if (!d) d = new Date();
   const dateObj = (typeof d === "string" || typeof d === "number") ? new Date(d) : d;
   const validDate = isNaN(dateObj.getTime()) ? new Date() : dateObj;
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(validDate);
+  return IST_DATE_FMT.format(validDate);
 }
 
 function getISTDate(d) {
@@ -31,13 +40,7 @@ function getISTHoursAndMins(d) {
   if (!d) d = new Date();
   const dateObj = (typeof d === "string" || typeof d === "number") ? new Date(d) : d;
   const validDate = isNaN(dateObj.getTime()) ? new Date() : dateObj;
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Kolkata',
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: false
-  });
-  const parts = formatter.formatToParts(validDate);
+  const parts = IST_TIME_FMT.formatToParts(validDate);
   let hour = parseInt(parts.find(p => p.type === 'hour').value);
   if (hour === 24) hour = 0;
   const minute = parseInt(parts.find(p => p.type === 'minute').value);

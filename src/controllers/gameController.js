@@ -1,4 +1,5 @@
 const Bet = require('../models/Bet');
+const IST_DATE_FMT_LOCAL = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }); // created once (performance)
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const Draw = require('../models/Draw');
@@ -17,7 +18,7 @@ function getISTDateStr(d) {
     d = new Date(d);
   }
   if (isNaN(d.getTime())) d = new Date();
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+  return IST_DATE_FMT_LOCAL.format(d);
 }
 
 function getGameBetDateKey(gameName, d) {
