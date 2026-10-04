@@ -434,43 +434,17 @@ const getWalletBalance = async (req, res) => {
 
 // @desc    Update wallet balance
 // @route   POST /api/user/wallet/balance
+// SECURITY: the app used to send its own idea of the balance here and the server
+// saved it, so anyone could set any wallet to any amount. Balances now change ONLY
+// on the server (EKQR deposits, bets, winnings, withdrawals, admin actions).
+// The request is accepted (old app versions still call it) but nothing is changed.
 const updateWalletBalance = async (req, res) => {
-  const { amount, mobile } = req.body;
-  const val = parseFloat(amount);
-  if (!isNaN(val)) {
-    let targetUser = null;
-    let cleanMobile = '';
-    if (mobile) {
-      cleanMobile = mobile.replace(/[^0-9]/g, '').slice(-10);
-      targetUser = registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile);
-    }
-
-    if (targetUser) {
-      targetUser.balance = val;
-      cleanMobile = targetUser.mobile.replace(/[^0-9]/g, '').slice(-10);
-    }
-    userWalletStore.balance = val;
-
-    const { saveDiskStore } = require('../store');
-    saveDiskStore();
-
-    // Sync wallet balance to MongoDB Atlas
-    try {
-      const mongoose = require('mongoose');
-      if (mongoose.connection.readyState === 1 && cleanMobile) {
-        const User = require('../models/User');
-        User.findOneAndUpdate(
-          { mobile: { $regex: new RegExp(cleanMobile + '$') } },
-          { wallet_balance: val, name: targetUser ? targetUser.name : 'User' },
-          { upsert: true, new: true }
-        ).then(() => console.log(`[MongoDB] Updated wallet balance for ${cleanMobile}: ₹${val}`))
-         .catch(e => console.error('[MongoDB Wallet Sync Error]', e));
-      }
-    } catch (e) { }
-
-    return res.json({ success: true, balance: val });
-  }
-  res.status(400).json({ message: 'Invalid balance amount' });
+  const { mobile } = req.body || {};
+  const cleanMobile = String(mobile || '').replace(/[^0-9]/g, '').slice(-10);
+  const targetUser = cleanMobile
+    ? registeredUsers.find(u => (u.mobile || '').replace(/[^0-9]/g, '').slice(-10) === cleanMobile)
+    : null;
+  return res.json({ success: true, ignored: true, balance: targetUser ? (targetUser.balance || 0) : 0 });
 };
 
 function formatISTDateTime(d, fallbackTs) {
@@ -717,6 +691,16 @@ const getTransactions = async (req, res) => {
 // @desc    Submit deposit request
 // @route   POST /api/user/deposit OR /api/user/deposit/request
 const submitDeposit = async (req, res) => {
+  // Deposits are accepted ONLY through the EKQR instant UPI gateway (auto-verified).
+  // Manual UPI/UTR requests are refused unless an admin explicitly sets
+  // settingsConfig.allow_manual_deposits = true.
+  const { settingsConfig: depositSettings } = require('../store');
+  if (!depositSettings || depositSettings.allow_manual_deposits !== true) {
+    return res.status(400).json({
+      success: false,
+      message: 'Manual UPI deposits are not accepted. Please use Instant UPI (auto-credit) to add money.'
+    });
+  }
   const { user, mobile, amount, method, utr } = req.body;
 
   const cleanMobile = (mobile || '').replace(/[^0-9]/g, '').slice(-10);

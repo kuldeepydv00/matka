@@ -23,6 +23,34 @@ function getFormattedDate(date = new Date()) {
 }
 
 /**
+ * Learn the UPI ID of the account linked in EKQR from EKQR's own payment links
+ * (upi://pay?pa=<upi id>&...) and remember it in the saved settings. The public
+ * /api/payment-methods returns it, so even the current Android app's fallback QR
+ * pays into the EKQR account.
+ */
+function rememberEkqrUpi(orderData) {
+  try {
+    const intent = (orderData && orderData.upi_intent) || {};
+    const links = [intent.bhim_link, intent.phonepe_link, intent.gpay_link, intent.paytm_link, orderData && orderData.payment_url];
+    for (const link of links) {
+      if (typeof link !== 'string') continue;
+      const m = /[?&]pa=([^&]+)/.exec(link);
+      if (!m) continue;
+      const upi = decodeURIComponent(m[1]).trim();
+      if (!/^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+$/.test(upi)) continue;
+      if (settingsConfig && settingsConfig.ekqr_upi_id !== upi) {
+        settingsConfig.ekqr_upi_id = upi;
+        const pn = /[?&]pn=([^&]+)/.exec(link);
+        if (pn) settingsConfig.ekqr_merchant_name = decodeURIComponent(pn[1].replace(/\+/g, ' ')).trim();
+        console.log(`[EKQR] Linked UPI account detected: ${upi}`);
+        saveDiskStore();
+      }
+      return;
+    }
+  } catch (e) {}
+}
+
+/**
  * Reusable helper to credit deposit to user balance idempotently
  */
 async function creditSuccessfulDeposit(clientTxnId, utr, gatewayTxnId, extraData = {}) {
@@ -293,6 +321,7 @@ exports.createEkqrOrder = async (req, res) => {
     }
 
     const orderData = data.data || {};
+    rememberEkqrUpi(orderData);
 
     // Record pending deposit in memory
     const newDeposit = {
@@ -323,13 +352,13 @@ exports.createEkqrOrder = async (req, res) => {
       const mongoose = require('mongoose');
       if (mongoose.connection.readyState === 1) {
         const DepositRequest = require('../models/DepositRequest');
-        await DepositRequest.create({
+        DepositRequest.create({
           user_id: cleanMobile,
           username: newDeposit.user,
           amount: numAmount,
           utr_number: clientTxnId,
           status: 'pending'
-        }).catch(() => {});
+        }).catch(() => {}); // not awaited: the app gives up after 4s, so answer fast
       }
     } catch (e) {}
 
@@ -452,33 +481,74 @@ exports.checkEkqrStatus = async (req, res) => {
 
 // @desc    Webhook handler for EKQR Gateway Instant Callbacks
 // @route   POST /api/payment/ekqr/webhook, POST /api/v1/callbacks/upigateway, GET ...
+// SECURITY: this URL is public, so anyone can call it with a fake "success" payload.
+// The payload is therefore NEVER trusted: only orders created by this server are
+// accepted, and the payment status and amount are confirmed directly with EKQR
+// (check_order_status, using our API key) before any wallet is credited.
+async function verifyEkqrOrder(clientTxnId, txnDate) {
+  let dateStr = txnDate;
+  if (!dateStr) {
+    const m = /^TXN_(\d{13})_/.exec(String(clientTxnId));
+    dateStr = m ? getFormattedDate(new Date(parseInt(m[1], 10))) : getFormattedDate();
+  }
+  const response = await fetch(`${EKQR_API_BASE}/check_order_status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ key: getApiKey(), client_txn_id: clientTxnId, txn_date: dateStr })
+  });
+  const data = await response.json();
+  if (!(data && (data.status === true || data.status === 'success') && data.data)) {
+    return { state: 'unknown', raw: data };
+  }
+  const orderData = data.data;
+  const st = String(orderData.status || '').toLowerCase();
+  if (st === 'success' || st === 'completed' || st === 'txndone') {
+    return { state: 'success', orderData, utr: orderData.upi_txn_id || orderData.bank_ref_num || orderData.id };
+  }
+  if (st === 'failure' || st === 'failed') return { state: 'failure', orderData };
+  return { state: 'pending', orderData };
+}
+
+async function isOrderCreatedByUs(clientTxnId) {
+  const mem = memoryDeposits.find(d => String(d.client_txn_id) === String(clientTxnId) && d.gateway === 'EKQR');
+  if (mem) return mem;
+  try {
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      const DepositRequest = require('../models/DepositRequest');
+      const dbDep = await DepositRequest.findOne({ utr_number: String(clientTxnId) }).lean();
+      if (dbDep) return { client_txn_id: clientTxnId, fromDb: true };
+    }
+  } catch (e) {}
+  return null;
+}
+
 exports.handleEkqrWebhook = async (req, res) => {
   try {
     const payload = { ...req.query, ...req.body };
-    console.log('[EKQR Webhook Callback Received]', JSON.stringify(payload, null, 2));
-
-    const clientTxnId = payload.client_txn_id || payload.clientTxnId || payload.order_id;
-    const status = String(payload.status || '').toLowerCase();
-    const upiTxnId = payload.upi_txn_id || payload.utr || payload.bank_ref_num || payload.id;
-    const gatewayTxnId = payload.id || payload.order_id;
-
+    console.log('[EKQR Webhook Callback Received]', JSON.stringify(payload));
+    const clientTxnId = payload.client_txn_id || payload.clientTxnId;
     if (!clientTxnId) {
-      console.warn('[EKQR Webhook] No client_txn_id found in webhook payload');
       return res.status(200).json({ status: false, message: 'No client_txn_id provided' });
     }
 
-    if (status === 'success' || status === 'completed' || status === 'txndone' || payload.status === true) {
-      await creditSuccessfulDeposit(clientTxnId, upiTxnId, gatewayTxnId, payload);
-      return res.status(200).json({ status: true, message: 'Webhook processed & deposit credited successfully' });
-    } else {
-      console.log(`[EKQR Webhook] Non-success status: ${status} for txn: ${clientTxnId}`);
-      let dep = memoryDeposits.find(d => String(d.client_txn_id) === String(clientTxnId));
-      if (dep && (status === 'failure' || status === 'failed')) {
-        dep.status = 'Rejected';
-        saveDiskStore();
-      }
-      return res.status(200).json({ status: true, message: `Status noted: ${status}` });
+    const ourOrder = await isOrderCreatedByUs(clientTxnId);
+    if (!ourOrder) {
+      console.warn(`[EKQR Webhook] Ignored unknown client_txn_id=${clientTxnId}`);
+      return res.status(200).json({ status: false, message: 'Unknown order' });
     }
+
+    const verified = await verifyEkqrOrder(clientTxnId, ourOrder.txn_date);
+    if (verified.state === 'success') {
+      await creditSuccessfulDeposit(clientTxnId, verified.utr, verified.orderData.id, verified.orderData);
+      return res.status(200).json({ status: true, message: 'Payment confirmed with EKQR & credited' });
+    }
+    if (verified.state === 'failure' && !ourOrder.fromDb && ourOrder.status !== 'Approved') {
+      ourOrder.status = 'Rejected';
+      saveDiskStore();
+    }
+    console.log(`[EKQR Webhook] Not credited: EKQR says ${verified.state} for ${clientTxnId}`);
+    return res.status(200).json({ status: true, message: `Status noted: ${verified.state}` });
   } catch (error) {
     console.error('[EKQR Webhook Processing Error]', error);
     // Always return 200 to prevent EKQR from endlessly retrying erroring callbacks

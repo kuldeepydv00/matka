@@ -1804,9 +1804,13 @@ const getWithdrawals = async (req, res) => {
           const cleanMobile = rawMobile.length >= 10 ? rawMobile.slice(-10) : '';
           const uMatch = allUsers.find(u => u.mobile === cleanMobile) || registeredUsers.find(u => u.mobile === cleanMobile);
 
+          const wIdStr = String(w._id);
           const existsIndex = memoryWithdrawals.findIndex(m => 
-            (m.id && String(m.id) === String(w._id)) || 
-            (m._id && String(m._id) === String(w._id))
+            (m.id && String(m.id) === wIdStr) || 
+            (m._id && String(m._id) === wIdStr) ||
+            (m.order_id && w.order_id && String(m.order_id) === String(w.order_id)) ||
+            (m.client_txn_id && w.client_txn_id && String(m.client_txn_id) === String(w.client_txn_id)) ||
+            (cleanMobile && m.mobile === cleanMobile && Math.abs((parseFloat(m.amount) || 0) - (parseFloat(w.amount) || 0)) < 0.01 && Math.abs((m.timestamp || 0) - (w.createdAt ? new Date(w.createdAt).getTime() : 0)) < 60000)
           );
 
           const accNum = w.account_number || w.accountNumber || w.account_details || (uMatch ? uMatch.account_number : null) || 'N/A';
@@ -1816,8 +1820,8 @@ const getWithdrawals = async (req, res) => {
           const upiVal = w.upi_id || w.upiId || w.upi || (uMatch ? uMatch.upi_id : null) || 'N/A';
 
           const wObj = {
-            id: String(w._id),
-            _id: String(w._id),
+            id: wIdStr,
+            _id: wIdStr,
             user: w.username || w.user_name || w.name || (uMatch ? uMatch.name : 'User'),
             mobile: cleanMobile || (uMatch ? uMatch.mobile : 'N/A'),
             phone: cleanMobile || (uMatch ? uMatch.mobile : 'N/A'),
@@ -1885,7 +1889,24 @@ const getWithdrawals = async (req, res) => {
   } catch (e) {
     console.error('[Admin Withdrawals Error]', e);
   }
-  memoryWithdrawals.sort((a, b) => {
+
+  // Deduplicate memoryWithdrawals by ID & Mobile+Amount+Time
+  const seenWthKeys = new Set();
+  const dedupedWithdrawals = [];
+  for (const w of memoryWithdrawals) {
+    const wId = String(w._id || w.id || '');
+    const mob = (w.mobile || w.phone || '').replace(/[^0-9]/g, '').slice(-10);
+    const amt = parseFloat(w.amount) || 0;
+    const ts = w.timestamp || (w.createdAt ? new Date(w.createdAt).getTime() : 0);
+    const timeBucket = Math.floor(ts / 120000);
+    const key = wId.length > 5 ? wId : `${mob}_${amt}_${timeBucket}`;
+    if (!seenWthKeys.has(key)) {
+      seenWthKeys.add(key);
+      dedupedWithdrawals.push(w);
+    }
+  }
+
+  dedupedWithdrawals.sort((a, b) => {
     const statusA = String(a.status || 'Pending').toLowerCase();
     const statusB = String(b.status || 'Pending').toLowerCase();
     const isPendingA = statusA === 'pending';
@@ -1898,7 +1919,7 @@ const getWithdrawals = async (req, res) => {
     const tB = b.timestamp || (b.createdAt ? new Date(b.createdAt).getTime() : 0);
     return tB - tA;
   });
-  res.json(memoryWithdrawals);
+  res.json(dedupedWithdrawals);
 };
 
 // @desc    Create deposit request (from user app or manual)
@@ -3586,47 +3607,68 @@ const getPackages = async (req, res) => {
   ]);
 };
 
-let memoryPaymentMethods = [
-  {
-    _id: 'pm_1',
-    id: 'pm_1',
-    name: 'PhonePe / GPay / Paytm UPI',
-    upiId: '8930507940@ybl',
-    upi_id: '8930507940@ybl',
-    merchant_name: 'Matka Official',
-    ordering: 1,
-    qrCode: 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=8930507940@ybl',
-    updateDate: new Date().toLocaleDateString(),
-    status: 'Active'
-  }
-];
+// No built-in UPI ID: only payment methods saved by the admin are ever returned.
+let memoryPaymentMethods = [];
 
-const getPaymentMethods = async (req, res) => {
+let lastPaymentMethodsLoad = 0;
+async function loadPaymentMethodsFromDb() {
   try {
     const mongoose = require('mongoose');
-    if (mongoose.connection.readyState === 1) {
-      const PaymentMethod = require('../models/PaymentMethod');
-      const dbPMs = await PaymentMethod.find().sort({ updatedAt: -1 }).lean();
-      if (dbPMs && dbPMs.length > 0) {
-        memoryPaymentMethods = dbPMs.map(p => {
-          const actualUpi = p.upi_id || p.upiId || p.upi || '';
-          return {
-            _id: String(p._id),
-            id: String(p._id),
-            name: p.name || 'PhonePe / GPay / Paytm UPI',
-            upiId: actualUpi,
-            upi_id: actualUpi,
-            merchant_name: p.merchant_name || 'Matka Official',
-            ordering: p.ordering || 1,
-            qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${actualUpi}&pn=${encodeURIComponent(p.merchant_name || 'Matka Official')}`,
-            updateDate: p.updateDate || (p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : 'Today'),
-            status: p.status || 'Active'
-          };
-        });
-      }
+    if (mongoose.connection.readyState !== 1) return;
+    const PaymentMethod = require('../models/PaymentMethod');
+    const dbPMs = await PaymentMethod.find().sort({ updatedAt: -1 }).lean();
+    lastPaymentMethodsLoad = Date.now();
+    if (dbPMs && dbPMs.length > 0) {
+      memoryPaymentMethods = dbPMs.map(p => {
+        const actualUpi = p.upi_id || p.upiId || p.upi || '';
+        return {
+          _id: String(p._id),
+          id: String(p._id),
+          name: p.name || 'PhonePe / GPay / Paytm UPI',
+          upiId: actualUpi,
+          upi_id: actualUpi,
+          merchant_name: p.merchant_name || 'Matka Official',
+          ordering: p.ordering || 1,
+          qrCode: `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=upi://pay?pa=${actualUpi}&pn=${encodeURIComponent(p.merchant_name || 'Matka Official')}`,
+          updateDate: p.updateDate || (p.updatedAt ? new Date(p.updatedAt).toLocaleDateString() : 'Today'),
+          status: p.status || 'Active'
+        };
+      });
     }
   } catch (e) {
     console.error('[Get Payment Methods Error]', e);
+  }
+}
+
+// GET /api/admin/payment-methods -> the admin's saved list (Payment Methods page).
+// GET /api/payment-methods (used by the Android app, which cannot be updated) ->
+//   ONLY the UPI account linked in EKQR. The current app shows a QR to this UPI if
+//   creating the EKQR order fails, so returning the EKQR account here makes sure that
+//   money still goes to the EKQR account (never to a built-in or other UPI ID).
+const getPaymentMethods = async (req, res) => {
+  // Answer from memory; refresh from the database at most every 30s in the background.
+  if (memoryPaymentMethods.length === 0) {
+    await loadPaymentMethodsFromDb();
+  } else if (Date.now() - lastPaymentMethodsLoad > 30000) {
+    loadPaymentMethodsFromDb();
+  }
+
+  const isAdminList = req.baseUrl === '/api/admin';
+  if (!isAdminList) {
+    const { settingsConfig } = require('../store');
+    const ekqrUpi = settingsConfig && settingsConfig.ekqr_upi_id;
+    if (ekqrUpi) {
+      return res.json([{
+        _id: 'ekqr',
+        id: 'ekqr',
+        name: 'Instant UPI (EKQR)',
+        upiId: ekqrUpi,
+        upi_id: ekqrUpi,
+        merchant_name: settingsConfig.ekqr_merchant_name || '95X MATKA',
+        ordering: 1,
+        status: 'Active'
+      }]);
+    }
   }
   res.json(memoryPaymentMethods);
 };

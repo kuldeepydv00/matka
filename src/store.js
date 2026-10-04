@@ -101,11 +101,11 @@ let referralConfig = {
 };
 
 let appVersionConfig = {
-  latestVersionCode: 103,
-  latestVersionName: '1.0.103',
+  latestVersionCode: 104,
+  latestVersionName: '1.0.104',
   minSupportedVersion: 1,
   apkUrl: 'https://95xmatka.com/95xmatka.apk',
-  updateMessage: '🚀 New Update Available! Dynamic Rule Book rates (10 ka 970), performance boost & fast betting. Tap UPDATE NOW!',
+  updateMessage: '🚀 New Update Available! Saved Bank Name support for instant 1-click withdrawals & fast betting.',
   forceUpdate: true
 };
 
