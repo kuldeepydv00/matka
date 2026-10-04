@@ -561,13 +561,13 @@ function loadDiskStore() {
       if (data.bannerConfig) Object.assign(bannerConfig, data.bannerConfig);
       if (data.referralConfig) Object.assign(referralConfig, data.referralConfig);
       if (data.appVersionConfig) Object.assign(appVersionConfig, data.appVersionConfig);
-      appVersionConfig.latestVersionCode = 100;
-      appVersionConfig.latestVersionName = '1.0.100';
+      appVersionConfig.latestVersionCode = 104;
+      appVersionConfig.latestVersionName = '1.0.104';
       appVersionConfig.forceUpdate = false;
       appVersionConfig.updateMessage = '🚀 New Update Available! Saved Bank Name support for instant 1-click withdrawals & fast betting.';
       appVersionConfig.apkUrl = 'https://95xmatka.com/95xmatka.apk';
       if (data.settingsConfig) Object.assign(settingsConfig, data.settingsConfig);
-      settingsConfig.latestVersionCode = 100;
+      settingsConfig.latestVersionCode = 104;
       settingsConfig.forceUpdate = false;
       settingsConfig.updateMessage = '🚀 New Update Available! Saved Bank Name support for instant 1-click withdrawals & fast betting.';
       if (data.bannersListStore && Array.isArray(data.bannersListStore)) bannersListStore.length = 0, bannersListStore.push(...data.bannersListStore);
